@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(flutter:*)",
+      "Bash(npm:*)",
+      "Bash(echo SUPABASE_CLI_MISSING:*)",
+      "Bash(cd:*)",
+      "Bash(rm:*)",
+      "Bash(reg add:*)",
+      "Bash(powershell:*)",
+      "Bash(echo ALREADY_INIT:*)",
+      "Bash(npx supabase:*)",
+      "Bash(which npx && npx --yes supabase init --workdir \"C:/Users/shoot/Desktop/CLAUDE/bon de livraison\" 2>&1)",
+      "Bash(cd \"C:/Users/shoot/Desktop/CLAUDE/bon de livraison\" && npx --yes supabase login 2>&1)",
+      "Bash(cd \"C:/Users/shoot/Desktop/CLAUDE/bon de livraison\" && SUPABASE_ACCESS_TOKEN=sbp_f24d3f57f0d98c89dd53982b2cb0cca02e839bcd npx supabase link --project-ref bpxsodccsochwltzilqr 2>&1)",
+      "Bash(cd \"C:/Users/shoot/Desktop/CLAUDE/bon de livraison\" && SUPABASE_ACCESS_TOKEN=sbp_f24d3f57f0d98c89dd53982b2cb0cca02e839bcd npx supabase db execute --file sql/schema.sql 2>&1)",
+      "Bash(cd \"C:/Users/shoot/Desktop/CLAUDE/bon de livraison\" && SUPABASE_ACCESS_TOKEN=sbp_f24d3f57f0d98c89dd53982b2cb0cca02e839bcd npx supabase db push 2>&1)",
+      "Bash(cd \"C:/Users/shoot/Desktop/CLAUDE/bon de livraison\" && cat sql/schema.sql | SUPABASE_ACCESS_TOKEN=sbp_f24d3f57f0d98c89dd53982b2cb0cca02e839bcd npx supabase db execute 2>&1)",
+      "Bash(cd \"C:/Users/shoot/Desktop/CLAUDE/bon de livraison\" && SUPABASE_ACCESS_TOKEN=sbp_f24d3f57f0d98c89dd53982b2cb0cca02e839bcd npx supabase functions deploy generate_and_email_pdf --no-verify-jwt 2>&1)",
+      "Bash(cd \"C:/Users/shoot/Desktop/CLAUDE/bon de livraison\" && SUPABASE_ACCESS_TOKEN=sbp_f24d3f57f0d98c89dd53982b2cb0cca02e839bcd npx supabase secrets set RESEND_API_KEY=re_9kFcbvM5_3HPF5yXXYU6pFeSAAYbJjFh1 2>&1)",
+      "Bash(curl:*)",
+      "Bash(grep system-images;android-3:*)",
+      "Bash(grep system-images;android-34;google_apis;x86_64\\\\|system-images;android-35;google_apis;x86_64\\\\|system-images;android-34;google_apis_playstore;x86_64:*)",
+      "Bash(echo \"y\" | C:/dev/android-sdk/cmdline-tools/latest/bin/sdkmanager.bat \"system-images;android-34;google_apis;x86_64\" \"platform-tools\" \"emulator\" 2>&1)",
+      "Bash(C:/dev/android-sdk/cmdline-tools/latest/bin/avdmanager.bat create:*)",
+      "Bash(C:/dev/android-sdk/platform-tools/adb.exe devices:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(C:/dev/android-sdk/emulator/emulator.exe:*)"
+    ]
+  }
+}

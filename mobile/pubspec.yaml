@@ -1,0 +1,26 @@
+name: joja_bdl
+description: Application mobile JOJA DISTRIBUTION - Bons de Livraison
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.5.0       # Client Supabase (Auth + DB + Storage)
+  speech_to_text: ^7.0.0         # Reconnaissance vocale
+  hand_signature: ^3.0.3         # Canvas signature
+  connectivity_plus: ^6.0.0      # Vérifier la connexion internet
+  path_provider: ^2.1.0          # Accès au système de fichiers
+  url_launcher: ^6.2.0           # Ouvrir des URLs
+  intl: ^0.19.0                  # Formatage dates en français
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
