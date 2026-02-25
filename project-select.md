@@ -1,47 +1,101 @@
-# Project Select - JOJA DISTRIBUTION
+# Project Select - JOJA DISTRIBUTION (v2.0 Standalone)
 
-## Choix du projet et décisions techniques
+## Historique des decisions
+
+### Migration Supabase → Standalone (25 fevrier 2026)
+**Probleme** : JOJA partageait la meme instance Supabase que tous les autres projets (Admin-Hub, Kooki, etc.). Quand on creait un livreur dans JOJA, il apparaissait dans la page utilisateurs d'Admin-Hub car ils partageaient la table `auth.users`.
+
+**Decision** : Rendre JOJA 100% independant — sa propre base de donnees, son propre systeme d'auth, son propre stockage de fichiers. Zero dependance a Supabase.
 
 ### Pourquoi cette stack ?
 
-| Besoin                  | Solution choisie          | Raison                                              |
-|-------------------------|---------------------------|------------------------------------------------------|
-| Base de données         | Supabase (Postgres)       | Gratuit, hébergé, Auth + Storage intégrés            |
-| Authentification        | Supabase Auth             | Email/password, gestion des rôles via table profiles |
-| Stockage fichiers       | Supabase Storage          | Signatures PNG, PDFs, logos - signed URLs sécurisées |
-| Génération PDF          | pdf-lib (Edge Function)   | Vrai PDF natif, pas de service externe               |
-| Envoi emails            | Resend                    | API simple, plan gratuit suffisant pour MVP          |
-| App mobile              | Flutter                   | Cross-platform Android/iOS, un seul code             |
-| Dictée vocale           | speech_to_text (Flutter)  | Package natif, supporte le français                  |
-| Signature               | hand_signature (Flutter)  | Canvas simple, export PNG                            |
-| Admin web               | Next.js TypeScript        | Rapide à mettre en place, SSR, écosystème React      |
+| Besoin | Solution choisie | Raison |
+|--------|------------------|--------|
+| Base de donnees | PostgreSQL 16 (container Docker dedie) | Independance totale, pas de partage avec d'autres projets |
+| Authentification | bcrypt + JWT custom | Simple, pas de dependance externe, HttpOnly cookies securises |
+| Stockage fichiers | Filesystem local (dossier public Next.js) | Simple, pas besoin de service externe |
+| Generation PDF | pdf-lib (API route Next.js) | Vrai PDF natif, fonctionne en Node.js sans service externe |
+| Envoi emails | Resend API | API simple, plan gratuit suffisant |
+| App mobile | Flutter | Cross-platform Android/iOS, un seul code |
+| Dictee vocale | speech_to_text (Flutter) | Package natif, supporte le francais |
+| Signature | hand_signature (Flutter) | Canvas simple, export PNG |
+| Admin web | Next.js 14 TypeScript | API REST integrees, SSR, deploiement standalone |
+| Deploiement | Coolify (nixpacks) | PaaS self-hosted, SSL automatique via Traefik |
 
-### Structure des données
+### Pourquoi pas Supabase ?
+- Partage de `auth.users` entre projets = fuite de donnees
+- Dependance a un service externe pour l'auth
+- RLS complexe et source de bugs (recursion infinie)
+- Edge Functions en Deno = limitations et complexite
+- Signed URLs pour les fichiers = complexite inutile
+
+### Pourquoi JWT custom plutot qu'un service d'auth ?
+- Controle total sur les tokens et les roles
+- Pas de dependance externe
+- Cookie HttpOnly pour le web = securise et transparent
+- Bearer token pour le mobile = simple et standard
+- bcrypt 12 rounds = securite suffisante
+
+---
+
+## Architecture technique
+
+### Infrastructure
+```
+Serveur OVH (217.182.89.133)
+├── Coolify (PaaS)
+│   ├── JOJA Distribution (Next.js 14 standalone) → joja.swipego.app
+│   │   ├── App UUID : p0g8g8gc0wgs8cwwss8oocgc
+│   │   ├── Build pack : nixpacks
+│   │   └── Base directory : /web
+│   └── PostgreSQL 16 (container dedie)
+│       ├── UUID : po4gc0sg84wkocg0wg0ccssk
+│       ├── Database : joja
+│       ├── User : joja
+│       └── Acces interne uniquement (pas de port public)
+├── Flutter SDK : /opt/flutter
+├── Android SDK : /opt/android-sdk
+└── Java 17 : /usr/lib/jvm/java-17-openjdk-amd64
+```
+
+### Variables d'environnement (Coolify)
+```
+DATABASE_URL=postgres://joja:JojaDistr2026SecureDB@po4gc0sg84wkocg0wg0ccssk:5432/joja
+JWT_SECRET=bd1e4cb2f1309aeaf9964785a385988f2db5bfb66ebe98017f3a337d930486f185117295911a728493f87fb7294f2be0
+RESEND_API_KEY=re_9kFcbvM5_3HPF5yXXYU6pFeSAAYbJjFh1
+UPLOADS_DIR=/app/uploads
+```
+
+---
+
+## Structure des donnees
 
 ```
-profiles (1 par utilisateur)
-  ├── id (UUID, ref auth.users)
+users (remplace auth.users + profiles de Supabase)
+  ├── id (UUID, gen_random_uuid())
+  ├── email (UNIQUE, NOT NULL)
+  ├── password_hash (bcrypt 12 rounds)
   ├── role: 'admin' | 'driver'
-  ├── name
+  ├── name (NOT NULL)
   └── created_at
 
 company_settings (1 ligne unique)
   ├── company_name (default: 'JOJA DISTRIBUTION')
-  ├── logo_path (optionnel, bucket "logos")
+  ├── logo_path (optionnel)
   ├── main_email (default: 'joy.slama@gmail.com')
   └── created_at
 
 delivery_notes (1 par bon de livraison)
   ├── id (UUID)
-  ├── bdl_number: BDL-YYYYMMDD-XXXXX (unique, auto-généré)
+  ├── bdl_number: BDL-YYYYMMDD-XXXXX (unique, auto-genere via bdl_daily_seq)
   ├── client_name (obligatoire)
   ├── client_email (optionnel)
   ├── address (obligatoire)
   ├── details (obligatoire)
-  ├── signature_path → bucket "signatures" (ex: BDL-20260223-00001.png)
-  ├── pdf_path → bucket "pdfs" (ex: BDL-20260223-00001.pdf)
+  ├── signature_path → fichier dans uploads/signatures/
+  ├── pdf_path → fichier dans uploads/pdfs/
   ├── status: VALIDATED | EMAIL_SENT | EMAIL_FAILED
-  ├── driver_id → profiles.id
+  ├── driver_id → users.id
   ├── validated_at
   └── created_at
 
@@ -53,7 +107,7 @@ email_logs (1 par envoi d'email)
   ├── error (texte de l'erreur si failed)
   └── created_at
 
-clients (base de fiches clients, gérée par l'admin)
+clients (base de fiches clients)
   ├── id (UUID)
   ├── name (obligatoire)
   ├── email (optionnel)
@@ -61,175 +115,198 @@ clients (base de fiches clients, gérée par l'admin)
   └── created_at
 ```
 
-### Flux principal
+---
+
+## Systeme d'authentification
+
+### Flux
+```
+[Login] → POST /api/auth/login (email + password)
+  ├── Verification bcrypt du mot de passe
+  ├── Generation JWT (expire 7 jours)
+  ├── Web : cookie HttpOnly "joja_token" (secure en prod, sameSite: lax)
+  └── Mobile : token dans le body JSON → stocke dans SharedPreferences
+
+[Auth middleware] → verifie dans l'ordre :
+  1. Header Authorization: Bearer <token>
+  2. Cookie joja_token
+  3. Query param ?token=... (pour PDF dans navigateur externe mobile)
+```
+
+### Roles et permissions
+| Action | Driver (livreur) | Admin |
+|--------|-----------------|-------|
+| Voir ses BDL | Oui | Oui (tous) |
+| Creer un BDL | Oui | Non (pas depuis le web) |
+| Voir les chauffeurs | Non | Oui |
+| Creer/supprimer un chauffeur | Non | Oui |
+| Voir les clients | Oui (autocompletion) | Oui |
+| Creer/modifier/supprimer un client | Non | Oui |
+
+L'autorisation se fait dans les API routes (pas de RLS SQL).
+
+---
+
+## API REST
+
+### Auth
+| Route | Methode | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/auth/login` | POST | Non | Login → JWT + cookie |
+| `/api/auth/me` | GET | Oui | User courant |
+| `/api/auth/logout` | POST | Non | Supprime le cookie |
+
+### Bons de livraison
+| Route | Methode | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/delivery-notes` | GET | Oui | Liste (filtres: client_name, status, date) |
+| `/api/delivery-notes` | POST | Oui | Creer un BDL |
+| `/api/delivery-notes/[id]` | GET | Oui | Detail |
+| `/api/delivery-notes/[id]` | PATCH | Oui | Modifier |
+
+### Fichiers
+| Route | Methode | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/files/upload` | POST | Oui | Upload multipart (bucket: logos/signatures/pdfs) |
+| `/api/files/[bucket]/[filename]` | GET | Oui | Servir un fichier |
+
+### PDF et email
+| Route | Methode | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/generate-pdf` | POST | Oui | Generer PDF + envoyer email |
+| `/api/send-to-client` | POST | Oui | Renvoyer PDF au client |
+
+### CRUD
+| Route | Methode | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/drivers` | GET/POST/DELETE | Admin | CRUD chauffeurs |
+| `/api/clients` | GET/POST/PUT/DELETE | Oui | CRUD clients |
+| `/api/email-logs` | GET | Oui | Logs email par delivery_note_id |
+
+Toutes les routes incluent des headers CORS pour l'acces mobile.
+
+---
+
+## Flux principal
 
 ```
 [Livreur - Mobile Flutter]
-  1. Login (email/password via Supabase Auth)
+  1. Login (email/password via POST /api/auth/login)
   2. Saisir infos BDL :
-     - Client / Société (obligatoire) + AUTOCOMPLÉTION depuis table clients
-       → Quand un client est sélectionné, email + adresse sont pré-remplis
-       → Le livreur peut aussi taper un nom libre (client non enregistré)
-     - Email client (optionnel, validé si rempli)
+     - Client (obligatoire) + autocompletion depuis /api/clients
+     - Email client (optionnel)
      - Adresse (obligatoire)
-     - Détail livraison (obligatoire) + bouton Dicter (speech_to_text FR)
-     - Zone signature (hand_signature canvas) + bouton Effacer
+     - Detail livraison (obligatoire) + bouton Dicter (speech_to_text FR)
+     - Zone signature (hand_signature canvas)
   3. Clic VALIDER
-     │
-     ├── Vérification connectivité (sinon "Connexion requise")
-     ├── Validation des champs obligatoires
-     ├── INSERT delivery_notes → récupère id + bdl_number
-     ├── Export signature en PNG (hand_signature → Uint8List)
-     ├── UPLOAD signature.png → bucket "signatures"
-     ├── UPDATE delivery_notes.signature_path
-     └── APPEL supabase.functions.invoke('generate_and_email_pdf')
-           │
-           ├── Charge BDL + company_settings + profil livreur
-           ├── Télécharge signature depuis Storage (base64)
-           ├── Télécharge logo si existant (base64)
-           ├── Génère un vrai PDF avec pdf-lib (layout A4, sections, signature PNG)
-           │     (import pdf-lib@1.17.1 via esm.sh - pas de service externe)
-           ├── UPLOAD pdf → bucket "pdfs"
-           ├── UPDATE delivery_notes.pdf_path
-           ├── ENVOIE email via Resend (PDF en pièce jointe)
-           │     ├── → joy.slama@gmail.com (toujours)
-           │     └── → client_email (si renseigné)
-           ├── INSERT email_logs (sent/failed + erreur)
-           ├── UPDATE delivery_notes.status (EMAIL_SENT / EMAIL_FAILED)
-           └── RETOURNE { ok, pdf_path, bdl_number, email_status }
-  4. Affiche succès + numéro BDL
-
-[Livreur - Historique Mobile]
-  - Liste des BDL du livreur (filtre driver_id = auth.uid() via RLS)
-  - Badge statut (EMAIL_SENT vert / EMAIL_FAILED rouge / VALIDATED orange)
-  - Clic → bottom sheet détail
-  - Bouton "Télécharger PDF" → signed URL → ouvre dans le navigateur
+     ├── POST /api/delivery-notes → recupere id + bdl_number
+     ├── Export signature en PNG
+     ├── POST /api/files/upload (bucket: signatures)
+     ├── PATCH /api/delivery-notes/[id] (signature_path)
+     └── POST /api/generate-pdf
+           ├── Charge BDL + company_settings + user (livreur)
+           ├── Lit signature depuis filesystem
+           ├── Genere PDF avec pdf-lib (layout A4)
+           ├── Sauvegarde PDF dans uploads/pdfs/
+           ├── Envoie email via Resend (PDF en piece jointe)
+           ├── INSERT email_logs
+           ├── UPDATE delivery_notes.status
+           └── Retourne { ok, pdf_path, bdl_number, email_status }
+  4. Affiche succes + numero BDL
 
 [Admin - Web Next.js]
-  1. Login (vérifie rôle 'admin' dans profiles)
-  2. Navigation : 3 onglets (Bons de Livraison | Chauffeurs | Clients)
-  3. Page Bons de Livraison : liste BDL avec filtres
-     - Filtre par client (recherche texte, ilike)
-     - Filtre par statut (VALIDATED / EMAIL_SENT / EMAIL_FAILED)
-     - Filtre par date
-     - Bouton réinitialiser
-  4. Clic sur un BDL → page détail :
-     - Affiche tous les champs + nom livreur
-     - Image signature (via signed URL)
-     - Bouton "Télécharger le PDF" (via signed URL)
-     - Historique emails (table email_logs)
-     - Bouton "Renvoyer l'email" si status = EMAIL_FAILED
-       → rappelle l'Edge Function generate_and_email_pdf
-     - Bouton "Envoyer au client (email@client.com)" (vert)
-       → API route /api/send-to-client (télécharge PDF + envoie via Resend)
-       → Visible si client_email renseigné et PDF disponible
-  5. Page Chauffeurs : gestion des comptes livreurs
-     - Tableau : nom, email, date de création
-     - Formulaire d'ajout (nom, email, mot de passe)
-     - Suppression avec confirmation
-  6. Page Clients : gestion de la base clients
-     - Tableau : nom, email, adresse, date de création
-     - Formulaire d'ajout (nom, email optionnel, adresse optionnelle)
-     - Modification inline (clic Modifier → champs éditables → Sauver)
-     - Suppression avec confirmation
-     - Ces clients alimentent l'autocomplétion mobile
+  1. Login → /api/auth/me verifie le role admin
+  2. Navigation : Bons de Livraison | Chauffeurs | Clients
+  3. Liste BDL avec filtres (client, statut, date)
+  4. Detail BDL : signature, PDF, historique emails, retry, envoi au client
+  5. Chauffeurs : tableau + ajout (bcrypt hash) + suppression
+  6. Clients : tableau + ajout + modification inline + suppression
 ```
 
-### Sécurité (RLS - Row Level Security)
+---
 
-| Table            | Driver (livreur)                    | Admin                    |
-|------------------|-------------------------------------|--------------------------|
-| profiles         | SELECT son propre profil            | SELECT tous les profils  |
-| company_settings | SELECT (lecture seule)              | SELECT + UPDATE          |
-| delivery_notes   | SELECT/INSERT/UPDATE ses propres BDL| SELECT + UPDATE tous     |
-| email_logs       | SELECT les logs de ses propres BDL  | SELECT tous les logs     |
-| clients          | SELECT tous (pour autocomplétion)   | ALL (CRUD complet)       |
-
-**CRITIQUE** : La vérification admin utilise `public.is_admin()` (fonction SQL SECURITY DEFINER) pour éviter la récursion infinie. Ne JAMAIS faire de SELECT direct sur `profiles` dans une policy RLS de `profiles`.
-
-### Storage (Supabase Storage)
-
-| Bucket      | Contenu                | Accès              | Nommage fichiers           |
-|-------------|------------------------|---------------------|----------------------------|
-| logos       | Logo société (optionnel)| SELECT authentifié | libre                      |
-| signatures  | Signatures PNG clients | INSERT + SELECT auth| {bdl_number}.png           |
-| pdfs        | PDFs générés           | SELECT authentifié | {bdl_number}.pdf           |
-
-Tous les buckets sont **privés**. L'accès se fait uniquement via **signed URLs** (durée : 1 heure).
-
-### Environnements et configuration
-
-| Variable                          | Où                        | Valeur                                          |
-|-----------------------------------|---------------------------|------------------------------------------------|
-| NEXT_PUBLIC_SUPABASE_URL          | web/.env.local            | https://bpxsodccsochwltzilqr.supabase.co       |
-| NEXT_PUBLIC_SUPABASE_ANON_KEY     | web/.env.local            | (clé JWT anon - voir CLAUDE.md)                |
-| SUPABASE_URL                      | mobile/lib/main.dart      | Codé en dur comme defaultValue                 |
-| SUPABASE_ANON_KEY                 | mobile/lib/main.dart      | Codé en dur comme defaultValue                 |
-| RESEND_API_KEY                    | Supabase secrets          | re_9kFcbvM5_3HPF5yXXYU6pFeSAAYbJjFh1          |
-| SUPABASE_URL                      | Edge Function (auto)      | Injecté automatiquement par Supabase           |
-| SUPABASE_SERVICE_ROLE_KEY         | Edge Function (auto)      | Injecté automatiquement par Supabase           |
-
-### Template PDF (A4)
-Le PDF contient :
-- **En-tête** : Logo (si existant) + "JOJA DISTRIBUTION" en bleu + numéro BDL + date
-- **Titre** : "BON DE LIVRAISON" centré
-- **Bloc client** : Nom/société + Email (grille 2 colonnes)
+## Template PDF (A4)
+- **En-tete** : "JOJA DISTRIBUTION" en bleu + numero BDL + date
+- **Titre** : "BON DE LIVRAISON" centre
+- **Bloc client** : Nom/societe + Email
 - **Adresse** : bloc pleine largeur
-- **Détails livraison** : bloc fond bleu clair avec le texte
+- **Details livraison** : bloc fond bleu clair
 - **Livreur** : nom du livreur
-- **Signature** : image PNG + mention "Lu et approuvé"
-- **Pied de page** : nom société + date de génération
-- **Style** : bordures bleues, coins arrondis, polices propres
+- **Signature** : image PNG + mention "Lu et approuve"
+- **Pied de page** : nom societe + date de generation
+- Polices : Helvetica / HelveticaBold / HelveticaOblique (StandardFonts)
 
-### Email envoyé
-- **From** : `JOJA DISTRIBUTION <onboarding@resend.dev>` (mode test - à changer quand domaine vérifié)
-- **To** : `joy.slama@gmail.com` + client_email (si renseigné)
+---
+
+## Email envoye
+- **From** : `JOJA DISTRIBUTION <onboarding@resend.dev>` (mode test)
+- **To** : `joy.slama@gmail.com` + client_email (si renseigne)
 - **Sujet** : `Bon de Livraison BDL-YYYYMMDD-XXXXX - JOJA DISTRIBUTION`
-- **Corps** : HTML avec résumé (client, adresse, date, livreur)
-- **Pièce jointe** : le PDF en base64
+- **Corps** : HTML avec resume (client, adresse, date, livreur)
+- **Piece jointe** : le PDF en base64
 
-### Fonctionnalités implémentées (MVP)
-- Création BDL mobile avec signature + dictée vocale
-- Génération PDF + envoi email automatique via Edge Function
-- Admin web : liste BDL + filtres + détail + retry email
-- Gestion des chauffeurs (admin web)
-- Gestion des clients (admin web : CRUD complet)
-- Autocomplétion clients sur mobile (pré-remplissage email + adresse)
-- Historique BDL mobile + téléchargement PDF
+---
 
-### Limitations du MVP
-- Pas de mode offline (connexion obligatoire)
-- Pas de gestion multi-société (1 seule société : JOJA DISTRIBUTION)
-- Pas de gestion des produits/articles (texte libre pour les détails)
-- Pas de modification d'un BDL après validation
-- Email envoyé depuis onboarding@resend.dev (domaine test Resend) → ne peut envoyer qu'à jeremie.magnet@gmail.com tant qu'un domaine propre n'est pas vérifié sur Resend
-- Pas de pagination sur la liste des BDL (OK pour un MVP)
-- speech_to_text nécessite les permissions micro (Android/iOS)
+## APK Mobile
+- **URL** : `https://joja.swipego.app/apk/joja-distribution.apk`
+- **Build** : sur le serveur OVH avec Flutter 3.27.4
+- **Taille** : ~15MB (arm64-v8a + armeabi-v7a)
+- **Stockage** : fichier statique dans `web/public/apk/`
+- **Lien** : bouton vert dans la carte JOJA sur admin.swipego.app
 
-### Problèmes rencontrés et solutions
+### Procedure de mise a jour APK
+1. Pull + build sur le serveur : `flutter build apk --release`
+2. Supprimer l'ancien APK de `web/public/apk/`
+3. Copier le nouveau via scp
+4. Mettre a jour la date/heure dans Admin `index.html`
+5. Commit + push les deux repos
+6. Deployer les deux sur Coolify
 
-| Problème | Cause | Solution |
+---
+
+## Comptes utilisateurs
+
+| Role | Email | Mot de passe | Usage |
+|------|-------|-------------|-------|
+| Admin | jeremie.magnet@gmail.com | Admin2026! | Web admin |
+| Livreur | livreur@joja.com | Admin2026! | App mobile Flutter |
+
+---
+
+## Problemes rencontres et solutions
+
+| Probleme | Cause | Solution |
 |----------|-------|----------|
-| Récursion infinie RLS sur profiles | Policy admin faisait SELECT sur profiles | Fonction `is_admin()` SECURITY DEFINER |
-| Mot de passe avec `!` non reconnu | Échappement JSON dans curl/bash | Utiliser Node.js https.request |
-| supabase login impossible | Environnement non-TTY | Variable `SUPABASE_ACCESS_TOKEN` |
-| Flutter symlinks bloqués | Mode Développeur Windows désactivé | Activer dans Paramètres Windows (FAIT 24/02) |
-| Port 3000 occupé | Ancien processus Next.js | Next.js bascule auto sur 3001 |
-| Émulateur Android ne démarre pas | Hyperviseur Windows non activé | Activer "Plateforme de l'hyperviseur Windows" + "Plateforme de machine virtuelle" dans Fonctionnalités Windows, puis redémarrer |
-| Flutter "Unable to determine engine version" | PowerShell échoue dans Gradle subprocess | Workaround fallback COPY dans shared.bat |
-| Build Gradle échoue (aapt2) | Espaces dans le chemin du projet | Copier vers C:\dev\joja-app pour builder |
-| Page Clients bloquée sur "Chargement..." | API route GET via supabaseAdmin ne répondait pas | Utiliser Supabase client côté navigateur pour le SELECT |
-| PDF corrompu / ne s'ouvre pas | html2pdf.app ne marchait pas, fallback stockait du HTML brut en .pdf | Remplacement complet par pdf-lib (génération PDF native dans Deno) |
-| Resend : envoi échoue (403) | onboarding@resend.dev ne permet d'envoyer qu'au propriétaire du compte | Vérifier un domaine propre sur Resend OU utiliser Gmail SMTP |
+| Users JOJA dans admin.swipego.app | Supabase auth.users partage entre projets | Migration vers PostgreSQL dedie + auth custom |
+| Unicode `\u00e9` dans le navigateur | Subagent a ecrit des sequences d'echappement au lieu de caracteres UTF-8 | Remplacer toutes les sequences par les vrais caracteres |
+| Volume Docker non monte | Coolify nixpacks ignore `custom_docker_run_options` | Utiliser `web/public/` pour les fichiers statiques |
+| `!` dans mot de passe curl | Bash interprete `!` comme expansion d'historique | Utiliser double quotes echappees |
+| Docker sans sudo | User ubuntu pas dans le groupe docker | Toujours utiliser `sudo docker` |
+| SQL inline via docker exec | Single quotes causent des erreurs | Ecrire SQL dans un fichier, docker cp, puis psql -f |
+| PATH Windows injecte dans SSH | Bash local exporte le PATH Windows | Utiliser single quotes et PATH explicite dans la commande |
+| Flutter build local echoue | Mode Developpeur Windows desactive | Builder sur le serveur Linux a la place |
 
-### Évolutions possibles (post-MVP)
-- Ajout de lignes produits avec quantités et prix
-- Mode offline avec synchronisation (Hive/SQLite local)
-- Tableau de bord avec statistiques (nb BDL/jour, taux d'échec email)
+---
+
+## Limitations actuelles
+- Pas de mode offline (connexion obligatoire)
+- Pas de gestion multi-societe
+- Pas de gestion des produits/articles (texte libre)
+- Pas de modification d'un BDL apres validation
+- Email depuis onboarding@resend.dev (domaine test) → besoin de verifier un domaine
+- Pas de pagination sur la liste des BDL
+- Volume Docker non monte → fichiers uploades perdus au redeploiement
+  (les fichiers statiques dans web/public/ sont OK car inclus dans le build)
+
+---
+
+## Evolutions possibles
+- Verifier un domaine sur Resend pour envoyer a n'importe quelle adresse
+- Ajout de lignes produits avec quantites et prix
+- Mode offline avec synchronisation locale
+- Tableau de bord avec statistiques
 - Export CSV des BDL
-- Multi-société / multi-entrepôt
 - Notifications push pour le livreur
-- Scan code-barres pour identifier les produits
-- Géolocalisation de la livraison
 - Photo de la livraison (preuve)
-- Impression directe du BDL via imprimante Bluetooth
+- Pagination + recherche avancee
+- Configurer un vrai volume persistant pour les uploads (fichiers dynamiques)
