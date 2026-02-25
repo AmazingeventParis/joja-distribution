@@ -80,6 +80,8 @@ export async function POST(req: NextRequest) {
         );
       }
       userId = existingUser.id;
+      // Mettre a jour le mot de passe pour que le chauffeur puisse se connecter
+      await supabaseAdmin.auth.admin.updateUserById(userId, { password });
     } else {
       return NextResponse.json(
         { error: "Erreur creation compte : " + authError.message },
