@@ -118,6 +118,55 @@ export async function POST(req: NextRequest) {
   });
 }
 
+// PUT : modifier un chauffeur (nom, email, mot de passe)
+export async function PUT(req: NextRequest) {
+  const { id, name, email, password } = await req.json();
+
+  if (!id) {
+    return NextResponse.json({ error: "ID requis" }, { status: 400 });
+  }
+
+  // Mettre à jour le profil (nom)
+  if (name) {
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({ name })
+      .eq("id", id);
+
+    if (profileError) {
+      return NextResponse.json(
+        { error: "Erreur modification nom : " + profileError.message },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Mettre à jour l'email et/ou le mot de passe dans Supabase Auth
+  const authUpdate: { email?: string; password?: string } = {};
+  if (email) authUpdate.email = email;
+  if (password) {
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: "Le mot de passe doit contenir au moins 6 caractères" },
+        { status: 400 }
+      );
+    }
+    authUpdate.password = password;
+  }
+
+  if (Object.keys(authUpdate).length > 0) {
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, authUpdate);
+    if (authError) {
+      return NextResponse.json(
+        { error: "Erreur modification auth : " + authError.message },
+        { status: 500 }
+      );
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 // DELETE : supprimer un chauffeur
 export async function DELETE(req: NextRequest) {
   const { id } = await req.json();

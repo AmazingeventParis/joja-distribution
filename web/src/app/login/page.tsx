@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,20 +149,42 @@ export default function LoginPage() {
           >
             Mot de passe
           </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{
-              width: "100%",
-              padding: 10,
-              borderRadius: 6,
-              border: "1px solid #d1d5db",
-              fontSize: 14,
-              boxSizing: "border-box",
-            }}
-          />
+          <div style={{ position: "relative" }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{
+                width: "100%",
+                padding: 10,
+                paddingRight: 70,
+                borderRadius: 6,
+                border: "1px solid #d1d5db",
+                fontSize: 14,
+                boxSizing: "border-box",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                color: "#2563eb",
+                padding: 4,
+                fontWeight: 500,
+              }}
+            >
+              {showPassword ? "Masquer" : "Voir"}
+            </button>
+          </div>
         </div>
 
         <button
