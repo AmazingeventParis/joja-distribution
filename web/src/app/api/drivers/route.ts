@@ -49,24 +49,52 @@ export async function POST(req: NextRequest) {
   }
 
   // 1) Créer l'utilisateur dans Supabase Auth
+  let userId: string;
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true, // Pas besoin de confirmation par email
+    email_confirm: true,
   });
 
   if (authError) {
-    return NextResponse.json(
-      { error: "Erreur création compte : " + authError.message },
-      { status: 400 }
-    );
+    // Si l'email existe deja (Supabase partage entre projets), on recupere l'utilisateur existant
+    if (authError.message.includes("already been registered")) {
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const existingUser = listData?.users?.find((u) => u.email === email);
+      if (!existingUser) {
+        return NextResponse.json(
+          { error: "Utilisateur introuvable malgre l'erreur doublon" },
+          { status: 400 }
+        );
+      }
+      // Verifier qu'il n'a pas deja un profil driver
+      const { data: existingProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("id, role")
+        .eq("id", existingUser.id)
+        .single();
+      if (existingProfile?.role === "driver") {
+        return NextResponse.json(
+          { error: "Ce chauffeur existe deja" },
+          { status: 400 }
+        );
+      }
+      userId = existingUser.id;
+    } else {
+      return NextResponse.json(
+        { error: "Erreur creation compte : " + authError.message },
+        { status: 400 }
+      );
+    }
+  } else {
+    userId = authData.user.id;
   }
 
   // 2) Créer le profil avec le rôle "driver"
   const { error: profileError } = await supabaseAdmin
     .from("profiles")
     .upsert({
-      id: authData.user.id,
+      id: userId,
       name,
       role: "driver",
     });
@@ -81,7 +109,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     driver: {
-      id: authData.user.id,
+      id: userId,
       name,
       email,
     },
