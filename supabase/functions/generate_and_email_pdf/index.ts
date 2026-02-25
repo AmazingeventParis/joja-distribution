@@ -517,7 +517,7 @@ serve(async (req: Request) => {
             Authorization: `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: "JOJA DISTRIBUTION <onboarding@resend.dev>",
+            from: "JOJA DISTRIBUTION <noreply@swipego.app>",
             to: [toEmail],
             subject: `Bon de Livraison ${bdl.bdl_number} - ${companyName}`,
             html: `

@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: `${companyName} <onboarding@resend.dev>`,
+        from: `${companyName} <noreply@swipego.app>`,
         to: [bdl.client_email],
         subject: `Votre Bon de Livraison ${bdl.bdl_number} - ${companyName}`,
         html: `
