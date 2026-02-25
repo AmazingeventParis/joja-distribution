@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 interface Client {
   id: string;
@@ -12,6 +11,7 @@ interface Client {
   created_at: string;
 }
 
+// Page gestion des clients - utilise l'API REST
 export default function ClientsPage() {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
@@ -37,30 +37,31 @@ export default function ClientsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Vérifier l'authentification
+  // Verifier l'authentification via l'API REST
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
+    fetch("/api/auth/me")
+      .then((res) => {
+        if (!res.ok) {
+          router.push("/login");
+        } else {
+          loadClients();
+        }
+      })
+      .catch(() => {
         router.push("/login");
-      } else {
-        loadClients();
-      }
-    });
+      });
   }, [router]);
 
-  // Charger la liste des clients (directement via Supabase client)
+  // Charger la liste des clients via l'API REST
   const loadClients = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("*")
-        .order("name", { ascending: true });
-
-      if (error) {
-        console.error("Erreur chargement clients:", error);
+      const res = await fetch("/api/clients");
+      if (res.ok) {
+        const data = await res.json();
+        setClients(Array.isArray(data) ? data : []);
       } else {
-        setClients(data || []);
+        console.error("Erreur chargement clients:", res.statusText);
       }
     } catch (e) {
       console.error("Erreur chargement clients:", e);
@@ -68,7 +69,7 @@ export default function ClientsPage() {
     setLoading(false);
   };
 
-  // Créer un client
+  // Creer un client
   const handleCreate = async () => {
     setFormError("");
     setFormSuccess("");
@@ -103,7 +104,7 @@ export default function ClientsPage() {
         loadClients();
       }
     } catch (e) {
-      setFormError("Erreur réseau : " + String(e));
+      setFormError("Erreur r\u00e9seau : " + String(e));
     }
     setFormLoading(false);
   };
@@ -163,9 +164,9 @@ export default function ClientsPage() {
     setDeleteLoading(false);
   };
 
-  // Déconnexion
+  // Deconnexion via l'API REST
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   };
 
@@ -247,7 +248,7 @@ export default function ClientsPage() {
             fontWeight: 600,
           }}
         >
-          Déconnexion
+          D\u00e9connexion
         </button>
       </div>
 
@@ -396,7 +397,7 @@ export default function ClientsPage() {
                 fontSize: 14,
               }}
             >
-              {formLoading ? "Création en cours..." : "Créer le client"}
+              {formLoading ? "Cr\u00e9ation en cours..." : "Cr\u00e9er le client"}
             </button>
           </div>
         </div>
@@ -417,7 +418,7 @@ export default function ClientsPage() {
           </p>
         ) : clients.length === 0 ? (
           <p style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
-            Aucun client enregistré
+            Aucun client enregistr\u00e9
           </p>
         ) : (
           <table
@@ -432,7 +433,7 @@ export default function ClientsPage() {
                 <th style={{ padding: 12, textAlign: "left" }}>Nom</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Email</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Adresse</th>
-                <th style={{ padding: 12, textAlign: "left" }}>Date de création</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Date de cr\u00e9ation</th>
                 <th style={{ padding: 12, textAlign: "center" }}>Actions</th>
               </tr>
             </thead>
@@ -440,7 +441,7 @@ export default function ClientsPage() {
               {clients.map((client) => (
                 <tr key={client.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
                   {editId === client.id ? (
-                    // Mode édition
+                    // Mode edition
                     <>
                       <td style={{ padding: 8 }}>
                         <input

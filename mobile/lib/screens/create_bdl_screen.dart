@@ -2,13 +2,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:hand_signature/signature.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart';
+import '../services/api_service.dart';
 import '../services/connectivity_service.dart';
 
 // ============================================================
-// ÉCRAN CRÉATION D'UN BON DE LIVRAISON
-// Champs : client, email, adresse, détails (+ dictée vocale),
+// ECRAN CREATION D'UN BON DE LIVRAISON
+// Champs : client, email, adresse, details (+ dictee vocale),
 //          signature canvas, bouton VALIDER
 // ============================================================
 
@@ -20,13 +19,13 @@ class CreateBdlScreen extends StatefulWidget {
 }
 
 class _CreateBdlScreenState extends State<CreateBdlScreen> {
-  // Contrôleurs des champs de texte
+  // Controleurs des champs de texte
   final _clientController = TextEditingController();
   final _emailController = TextEditingController();
   final _addressController = TextEditingController();
   final _detailsController = TextEditingController();
 
-  // Liste des clients pour l'autocomplétion
+  // Liste des clients pour l'autocompletion
   List<Map<String, dynamic>> _clients = [];
 
   // Signature
@@ -40,7 +39,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
   final _speech = stt.SpeechToText();
   bool _isListening = false;
 
-  // État
+  // Etat
   bool _loading = false;
 
   @override
@@ -49,35 +48,32 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
     _loadClients();
   }
 
-  // Charger les clients depuis Supabase pour l'autocomplétion
+  // Charger les clients depuis l'API pour l'autocompletion
   Future<void> _loadClients() async {
     try {
-      final data = await supabase
-          .from('clients')
-          .select('*')
-          .order('name', ascending: true);
+      final clients = await ApiService.getClients();
       if (mounted) {
         setState(() {
-          _clients = List<Map<String, dynamic>>.from(data);
+          _clients = clients;
         });
       }
     } catch (e) {
-      // Silencieux : l'autocomplétion ne sera pas disponible
+      // Silencieux : l'autocompletion ne sera pas disponible
       debugPrint('Erreur chargement clients: $e');
     }
   }
 
   // Valider le formulaire et envoyer
   Future<void> _validate() async {
-    // Vérifier la connexion internet
+    // Verifier la connexion internet
     if (!await ConnectivityService.isConnected()) {
-      _showError('Connexion requise. Vérifiez votre connexion internet.');
+      _showError('Connexion requise. Verifiez votre connexion internet.');
       return;
     }
 
-    // Vérifier les champs obligatoires
+    // Verifier les champs obligatoires
     if (_clientController.text.trim().isEmpty) {
-      _showError('Le champ "Client / Société" est obligatoire.');
+      _showError('Le champ "Client / Societe" est obligatoire.');
       return;
     }
     if (_addressController.text.trim().isEmpty) {
@@ -85,18 +81,18 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
       return;
     }
     if (_detailsController.text.trim().isEmpty) {
-      _showError('Le champ "Détail livraison" est obligatoire.');
+      _showError('Le champ "Detail livraison" est obligatoire.');
       return;
     }
 
-    // Valider l'email si renseigné
+    // Valider l'email si renseigne
     final email = _emailController.text.trim();
     if (email.isNotEmpty && !_isValidEmail(email)) {
       _showError('L\'adresse email n\'est pas valide.');
       return;
     }
 
-    // Vérifier la signature
+    // Verifier la signature
     if (_signatureControl.isFilled != true) {
       _showError('Veuillez faire signer le client.');
       return;
@@ -105,8 +101,6 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
     setState(() => _loading = true);
 
     try {
-      final userId = supabase.auth.currentUser!.id;
-
       // 1) Exporter la signature en PNG
       final signatureBytes = await _signatureControl.toImage(
         color: Colors.black,
@@ -123,43 +117,29 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
       // Convertir en Uint8List
       final pngData = signatureBytes.buffer.asUint8List();
 
-      // 2) Créer l'enregistrement en base
-      final response = await supabase.from('delivery_notes').insert({
-        'client_name': _clientController.text.trim(),
-        'client_email': email.isEmpty ? null : email,
-        'address': _addressController.text.trim(),
-        'details': _detailsController.text.trim(),
-        'driver_id': userId,
-      }).select().single();
+      // 2) Uploader la signature via l'API
+      final signaturePath = await ApiService.uploadSignature(pngData);
 
-      final bdlId = response['id'] as String;
-      final bdlNumber = response['bdl_number'] as String;
-
-      // 3) Uploader la signature dans Supabase Storage
-      final signaturePath = '$bdlNumber.png';
-      await supabase.storage.from('signatures').uploadBinary(
-        signaturePath,
-        pngData,
-        fileOptions: FileOptions(contentType: 'image/png'),
+      // 3) Creer l'enregistrement du BDL via l'API
+      final bdl = await ApiService.createDeliveryNote(
+        clientName: _clientController.text.trim(),
+        clientEmail: email.isEmpty ? null : email,
+        address: _addressController.text.trim(),
+        details: _detailsController.text.trim(),
+        signaturePath: signaturePath,
       );
 
-      // Mettre à jour le chemin de la signature dans le BDL
-      await supabase.from('delivery_notes').update({
-        'signature_path': signaturePath,
-      }).eq('id', bdlId);
+      final bdlId = bdl['id'] as String;
+      final bdlNumber = bdl['bdl_number'] as String;
 
-      // 4) Appeler l'Edge Function pour générer le PDF et envoyer l'email
-      final functionResponse = await supabase.functions.invoke(
-        'generate_and_email_pdf',
-        body: {'delivery_note_id': bdlId},
-      );
+      // 4) Appeler l'API pour generer le PDF et envoyer l'email
+      await ApiService.generatePdf(bdlId);
 
-      // 5) Afficher le résultat
+      // 5) Afficher le resultat
       if (mounted) {
-        final data = functionResponse.data;
         _showSuccess(
           bdlNumber: bdlNumber,
-          pdfPath: data?['pdf_path'] ?? '',
+          pdfPath: '',
         );
       }
     } catch (e) {
@@ -169,7 +149,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
     }
   }
 
-  // Démarrer/arrêter la dictée vocale
+  // Demarrer/arreter la dictee vocale
   Future<void> _toggleDictation() async {
     if (_isListening) {
       await _speech.stop();
@@ -193,11 +173,11 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
     await _speech.listen(
       onResult: (result) {
         setState(() {
-          // Ajouter le texte dicté au champ détails
+          // Ajouter le texte dicte au champ details
           _detailsController.text = result.recognizedWords;
         });
       },
-      localeId: 'fr_FR', // Français
+      localeId: 'fr_FR', // Francais
       listenMode: stt.ListenMode.dictation,
     );
   }
@@ -217,7 +197,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
     );
   }
 
-  // Afficher le succès avec numéro BDL
+  // Afficher le succes avec numero BDL
   void _showSuccess({required String bdlNumber, required String pdfPath}) {
     showDialog(
       context: context,
@@ -227,17 +207,17 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 28),
             SizedBox(width: 8),
-            Text('Succès !'),
+            Text('Succes !'),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Bon de livraison créé avec succès.'),
+            Text('Bon de livraison cree avec succes.'),
             const SizedBox(height: 12),
             Text(
-              'Numéro : $bdlNumber',
+              'Numero : $bdlNumber',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
@@ -246,7 +226,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Le PDF a été généré et l\'email envoyé.',
+              'Le PDF a ete genere et l\'email envoye.',
               style: TextStyle(color: Colors.grey),
             ),
           ],
@@ -255,7 +235,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              Navigator.of(context).pop(); // Retour à l'accueil
+              Navigator.of(context).pop(); // Retour a l'accueil
             },
             child: const Text('OK'),
           ),
@@ -275,9 +255,9 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- Client / Société (avec autocomplétion) ---
+            // --- Client / Societe (avec autocompletion) ---
             const Text(
-              'Client / Société *',
+              'Client / Societe *',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 6),
@@ -294,7 +274,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
               },
               displayStringForOption: (client) => client['name'] as String? ?? '',
               onSelected: (client) {
-                // Pré-remplir email et adresse
+                // Pre-remplir email et adresse
                 final email = client['email'] as String? ?? '';
                 final address = client['address'] as String? ?? '';
                 if (email.isNotEmpty) {
@@ -309,7 +289,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
                 textController.addListener(() {
                   _clientController.text = textController.text;
                 });
-                // Si _clientController a déjà du texte, le copier
+                // Si _clientController a deja du texte, le copier
                 if (_clientController.text.isNotEmpty && textController.text.isEmpty) {
                   textController.text = _clientController.text;
                 }
@@ -394,15 +374,15 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
             ),
             const SizedBox(height: 16),
 
-            // --- Détails livraison ---
+            // --- Details livraison ---
             Row(
               children: [
                 const Text(
-                  'Détail livraison *',
+                  'Detail livraison *',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 const Spacer(),
-                // Bouton dictée vocale
+                // Bouton dictee vocale
                 TextButton.icon(
                   onPressed: _toggleDictation,
                   icon: Icon(
@@ -410,7 +390,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
                     color: _isListening ? Colors.red : const Color(0xFF2563EB),
                   ),
                   label: Text(
-                    _isListening ? 'Arrêter' : 'Dicter',
+                    _isListening ? 'Arreter' : 'Dicter',
                     style: TextStyle(
                       color: _isListening ? Colors.red : const Color(0xFF2563EB),
                     ),
@@ -423,9 +403,9 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
               controller: _detailsController,
               maxLines: 5,
               decoration: InputDecoration(
-                hintText: 'Décrivez le contenu de la livraison...',
+                hintText: 'Decrivez le contenu de la livraison...',
                 border: const OutlineInputBorder(),
-                // Indicateur d'écoute
+                // Indicateur d'ecoute
                 suffixIcon: _isListening
                     ? const Padding(
                         padding: EdgeInsets.all(12),

@@ -1,108 +1,177 @@
 // API Route : gestion des clients (CRUD)
-// Utilise le service_role pour accès admin à Supabase
+// Remplace les appels supabaseAdmin par des requetes PostgreSQL directes
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { pool } from "@/lib/db";
+import { requireAuth, AuthError } from "@/lib/auth-middleware";
 
-// GET : lister tous les clients
-export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from("clients")
-    .select("*")
-    .order("name", { ascending: true });
+// Headers CORS pour acces mobile
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+};
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json(data || []);
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// POST : créer un nouveau client
+// GET : lister tous les clients
+export async function GET(req: NextRequest) {
+  try {
+    requireAuth(req);
+
+    const result = await pool.query(
+      "SELECT * FROM clients ORDER BY name ASC"
+    );
+
+    return NextResponse.json(result.rows, { headers: corsHeaders });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status, headers: corsHeaders }
+      );
+    }
+    console.error("Erreur GET /api/clients:", error);
+    return NextResponse.json(
+      { error: "Erreur interne du serveur" },
+      { status: 500, headers: corsHeaders }
+    );
+  }
+}
+
+// POST : creer un nouveau client
 export async function POST(req: NextRequest) {
-  const { name, email, address } = await req.json();
+  try {
+    requireAuth(req);
 
-  if (!name || !name.trim()) {
+    const { name, email, address } = await req.json();
+
+    if (!name || !name.trim()) {
+      return NextResponse.json(
+        { error: "Le nom du client est requis" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    const result = await pool.query(
+      `INSERT INTO clients (id, name, email, address, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+       RETURNING *`,
+      [name.trim(), email?.trim() || null, address?.trim() || null]
+    );
+
     return NextResponse.json(
-      { error: "Le nom du client est requis" },
-      { status: 400 }
+      { ok: true, client: result.rows[0] },
+      { status: 201, headers: corsHeaders }
+    );
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status, headers: corsHeaders }
+      );
+    }
+    console.error("Erreur POST /api/clients:", error);
+    return NextResponse.json(
+      { error: "Erreur creation client : " + String(error) },
+      { status: 500, headers: corsHeaders }
     );
   }
-
-  const { data, error } = await supabaseAdmin
-    .from("clients")
-    .insert({
-      name: name.trim(),
-      email: email?.trim() || null,
-      address: address?.trim() || null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Erreur création client : " + error.message },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ ok: true, client: data });
 }
 
 // PUT : modifier un client
 export async function PUT(req: NextRequest) {
-  const { id, name, email, address } = await req.json();
+  try {
+    requireAuth(req);
 
-  if (!id) {
-    return NextResponse.json({ error: "ID requis" }, { status: 400 });
-  }
+    const { id, name, email, address } = await req.json();
 
-  if (!name || !name.trim()) {
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID requis" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    if (!name || !name.trim()) {
+      return NextResponse.json(
+        { error: "Le nom du client est requis" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    const result = await pool.query(
+      `UPDATE clients SET name = $1, email = $2, address = $3
+       WHERE id = $4
+       RETURNING *`,
+      [name.trim(), email?.trim() || null, address?.trim() || null, id]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Client introuvable" },
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Le nom du client est requis" },
-      { status: 400 }
+      { ok: true, client: result.rows[0] },
+      { headers: corsHeaders }
+    );
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status, headers: corsHeaders }
+      );
+    }
+    console.error("Erreur PUT /api/clients:", error);
+    return NextResponse.json(
+      { error: "Erreur modification client : " + String(error) },
+      { status: 500, headers: corsHeaders }
     );
   }
-
-  const { data, error } = await supabaseAdmin
-    .from("clients")
-    .update({
-      name: name.trim(),
-      email: email?.trim() || null,
-      address: address?.trim() || null,
-    })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Erreur modification : " + error.message },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ ok: true, client: data });
 }
 
 // DELETE : supprimer un client
 export async function DELETE(req: NextRequest) {
-  const { id } = await req.json();
+  try {
+    requireAuth(req);
 
-  if (!id) {
-    return NextResponse.json({ error: "ID requis" }, { status: 400 });
-  }
+    const { id } = await req.json();
 
-  const { error } = await supabaseAdmin
-    .from("clients")
-    .delete()
-    .eq("id", id);
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID requis" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
 
-  if (error) {
+    const result = await pool.query(
+      "DELETE FROM clients WHERE id = $1 RETURNING id",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Client introuvable" },
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
+    return NextResponse.json({ ok: true }, { headers: corsHeaders });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status, headers: corsHeaders }
+      );
+    }
+    console.error("Erreur DELETE /api/clients:", error);
     return NextResponse.json(
-      { error: "Erreur suppression : " + error.message },
-      { status: 500 }
+      { error: "Erreur suppression client : " + String(error) },
+      { status: 500, headers: corsHeaders }
     );
   }
-
-  return NextResponse.json({ ok: true });
 }

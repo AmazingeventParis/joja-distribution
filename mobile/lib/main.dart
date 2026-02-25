@@ -1,93 +1,31 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'services/api_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 
 // ============================================================
 // POINT D'ENTREE DE L'APPLICATION
-// Initialise Supabase puis lance l'app
+// Initialise SharedPreferences puis lance l'app
+// Verifie si un token existe pour choisir l'ecran initial
 // ============================================================
-
-// Client HTTP qui redirige les requetes vers l'IP du serveur
-// pour contourner les problemes DNS sur certains telephones mobiles.
-// Le header Host est preserve pour que Traefik route correctement.
-class SupabaseIpClient extends http.BaseClient {
-  static const String _serverIp = '217.182.89.133';
-  static const String _serverHost = 'supabase-api.swipego.app';
-
-  final IOClient _client;
-
-  SupabaseIpClient()
-      : _client = IOClient(
-          HttpClient()
-            ..badCertificateCallback =
-                (X509Certificate cert, String host, int port) =>
-                    host == _serverIp,
-        );
-
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    if (request.url.host == _serverHost) {
-      final ipUrl = request.url.replace(host: _serverIp);
-      final newRequest = _rewrite(request, ipUrl);
-      return _client.send(newRequest);
-    }
-    return _client.send(request);
-  }
-
-  http.BaseRequest _rewrite(http.BaseRequest original, Uri newUri) {
-    if (original is http.Request) {
-      final r = http.Request(original.method, newUri)
-        ..headers.addAll(original.headers)
-        ..bodyBytes = original.bodyBytes;
-      r.headers['host'] = _serverHost;
-      return r;
-    }
-    if (original is http.MultipartRequest) {
-      final r = http.MultipartRequest(original.method, newUri)
-        ..headers.addAll(original.headers)
-        ..fields.addAll(original.fields)
-        ..files.addAll(original.files);
-      r.headers['host'] = _serverHost;
-      return r;
-    }
-    original.headers['host'] = _serverHost;
-    return original;
-  }
-
-  @override
-  void close() {
-    _client.close();
-  }
-}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialiser Supabase avec le client HTTP custom (bypass DNS)
-  await Supabase.initialize(
-    url: const String.fromEnvironment(
-      'SUPABASE_URL',
-      defaultValue: 'https://supabase-api.swipego.app',
-    ),
-    anonKey: const String.fromEnvironment(
-      'SUPABASE_ANON_KEY',
-      defaultValue: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3MTI3NDIyMCwiZXhwIjo0OTI2OTQ3ODIwLCJyb2xlIjoiYW5vbiJ9.4c5wruvy-jj3M8fSjhmgR4FvdF6za-mgawlkB_B0uB0',
-    ),
-    httpClient: SupabaseIpClient(),
-  );
+  // Initialiser SharedPreferences (necessaire pour ApiService)
+  await SharedPreferences.getInstance();
 
-  runApp(const JojaApp());
+  // Verifier si l'utilisateur est deja connecte
+  final isLoggedIn = await ApiService.isLoggedIn();
+
+  runApp(JojaApp(isLoggedIn: isLoggedIn));
 }
 
-// Raccourci pour acceder au client Supabase partout
-final supabase = Supabase.instance.client;
-
 class JojaApp extends StatelessWidget {
-  const JojaApp({super.key});
+  final bool isLoggedIn;
+
+  const JojaApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -103,9 +41,7 @@ class JojaApp extends StatelessWidget {
           centerTitle: true,
         ),
       ),
-      home: supabase.auth.currentSession != null
-          ? const HomeScreen()
-          : const LoginScreen(),
+      home: isLoggedIn ? const HomeScreen() : const LoginScreen(),
     );
   }
 }

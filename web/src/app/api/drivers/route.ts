@@ -1,192 +1,250 @@
-// API Route : gestion des chauffeurs (création / suppression)
-// Utilise le service_role pour accès admin à Supabase Auth
+// API Route : gestion des chauffeurs (CRUD)
+// Remplace les appels Supabase Auth + profiles par PostgreSQL + bcrypt
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { pool } from "@/lib/db";
+import { hashPassword } from "@/lib/auth";
+import { requireAuth, requireAdmin, AuthError } from "@/lib/auth-middleware";
+
+// Headers CORS pour acces mobile
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
 
 // GET : lister tous les chauffeurs
-export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select("id, name, role, created_at")
-    .eq("role", "driver")
-    .order("created_at", { ascending: false });
+export async function GET(req: NextRequest) {
+  try {
+    requireAuth(req);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const result = await pool.query(
+      `SELECT id, name, email, created_at
+       FROM users
+       WHERE role = 'driver'
+       ORDER BY created_at DESC`
+    );
+
+    return NextResponse.json(result.rows, { headers: corsHeaders });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status, headers: corsHeaders }
+      );
+    }
+    console.error("Erreur GET /api/drivers:", error);
+    return NextResponse.json(
+      { error: "Erreur interne du serveur" },
+      { status: 500, headers: corsHeaders }
+    );
   }
-
-  // Récupérer les emails depuis auth.users
-  const driversWithEmail = await Promise.all(
-    (data || []).map(async (driver) => {
-      const { data: userData } = await supabaseAdmin.auth.admin.getUserById(driver.id);
-      return {
-        ...driver,
-        email: userData?.user?.email || "Inconnu",
-      };
-    })
-  );
-
-  return NextResponse.json(driversWithEmail);
 }
 
-// POST : créer un nouveau chauffeur
+// POST : creer un nouveau chauffeur
 export async function POST(req: NextRequest) {
-  const { name, email, password } = await req.json();
+  try {
+    requireAdmin(req);
 
-  // Validation
-  if (!name || !email || !password) {
-    return NextResponse.json(
-      { error: "Nom, email et mot de passe sont requis" },
-      { status: 400 }
-    );
-  }
+    const { name, email, password } = await req.json();
 
-  if (password.length < 6) {
-    return NextResponse.json(
-      { error: "Le mot de passe doit contenir au moins 6 caractères" },
-      { status: 400 }
-    );
-  }
-
-  // 1) Créer l'utilisateur dans Supabase Auth
-  let userId: string;
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  });
-
-  if (authError) {
-    // Si l'email existe deja (Supabase partage entre projets), on recupere l'utilisateur existant
-    if (authError.message.includes("already been registered")) {
-      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const existingUser = listData?.users?.find((u) => u.email === email);
-      if (!existingUser) {
-        return NextResponse.json(
-          { error: "Utilisateur introuvable malgre l'erreur doublon" },
-          { status: 400 }
-        );
-      }
-      // Verifier qu'il n'a pas deja un profil driver
-      const { data: existingProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("id, role")
-        .eq("id", existingUser.id)
-        .single();
-      if (existingProfile?.role === "driver") {
-        return NextResponse.json(
-          { error: "Ce chauffeur existe deja" },
-          { status: 400 }
-        );
-      }
-      userId = existingUser.id;
-      // Mettre a jour le mot de passe pour que le chauffeur puisse se connecter
-      await supabaseAdmin.auth.admin.updateUserById(userId, { password });
-    } else {
+    // Validation
+    if (!name || !email || !password) {
       return NextResponse.json(
-        { error: "Erreur creation compte : " + authError.message },
-        { status: 400 }
+        { error: "Nom, email et mot de passe sont requis" },
+        { status: 400, headers: corsHeaders }
       );
     }
-  } else {
-    userId = authData.user.id;
-  }
 
-  // 2) Créer le profil avec le rôle "driver"
-  const { error: profileError } = await supabaseAdmin
-    .from("profiles")
-    .upsert({
-      id: userId,
-      name,
-      role: "driver",
-    });
-
-  if (profileError) {
-    return NextResponse.json(
-      { error: "Erreur création profil : " + profileError.message },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({
-    ok: true,
-    driver: {
-      id: userId,
-      name,
-      email,
-    },
-  });
-}
-
-// PUT : modifier un chauffeur (nom, email, mot de passe)
-export async function PUT(req: NextRequest) {
-  const { id, name, email, password } = await req.json();
-
-  if (!id) {
-    return NextResponse.json({ error: "ID requis" }, { status: 400 });
-  }
-
-  // Mettre à jour le profil (nom)
-  if (name) {
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .update({ name })
-      .eq("id", id);
-
-    if (profileError) {
-      return NextResponse.json(
-        { error: "Erreur modification nom : " + profileError.message },
-        { status: 500 }
-      );
-    }
-  }
-
-  // Mettre à jour l'email et/ou le mot de passe dans Supabase Auth
-  const authUpdate: { email?: string; password?: string } = {};
-  if (email) authUpdate.email = email;
-  if (password) {
     if (password.length < 6) {
       return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 6 caractères" },
-        { status: 400 }
+        { error: "Le mot de passe doit contenir au moins 6 caracteres" },
+        { status: 400, headers: corsHeaders }
       );
     }
-    authUpdate.password = password;
-  }
 
-  if (Object.keys(authUpdate).length > 0) {
-    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, authUpdate);
-    if (authError) {
+    // Verifier que l'email n'existe pas deja
+    const existing = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email.trim().toLowerCase()]
+    );
+
+    if (existing.rows.length > 0) {
       return NextResponse.json(
-        { error: "Erreur modification auth : " + authError.message },
-        { status: 500 }
+        { error: "Un utilisateur avec cet email existe deja" },
+        { status: 400, headers: corsHeaders }
       );
     }
-  }
 
-  return NextResponse.json({ ok: true });
+    // Hasher le mot de passe
+    const passwordHash = await hashPassword(password);
+
+    // Inserer le chauffeur
+    const result = await pool.query(
+      `INSERT INTO users (id, email, password_hash, role, name, created_at)
+       VALUES (gen_random_uuid(), $1, $2, 'driver', $3, NOW())
+       RETURNING id, email, name, created_at`,
+      [email.trim().toLowerCase(), passwordHash, name.trim()]
+    );
+
+    const driver = result.rows[0];
+
+    return NextResponse.json(
+      { ok: true, driver },
+      { status: 201, headers: corsHeaders }
+    );
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status, headers: corsHeaders }
+      );
+    }
+    console.error("Erreur POST /api/drivers:", error);
+    return NextResponse.json(
+      { error: "Erreur creation chauffeur : " + String(error) },
+      { status: 500, headers: corsHeaders }
+    );
+  }
+}
+
+// PUT : modifier un chauffeur (nom, email, mot de passe optionnel)
+export async function PUT(req: NextRequest) {
+  try {
+    requireAdmin(req);
+
+    const { id, name, email, password } = await req.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID requis" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Mettre a jour le nom et l'email
+    if (name || email) {
+      const updates: string[] = [];
+      const values: string[] = [];
+      let paramIndex = 1;
+
+      if (name) {
+        updates.push(`name = $${paramIndex}`);
+        values.push(name.trim());
+        paramIndex++;
+      }
+
+      if (email) {
+        // Verifier que le nouvel email n'est pas pris par un autre utilisateur
+        const existing = await pool.query(
+          "SELECT id FROM users WHERE email = $1 AND id != $2",
+          [email.trim().toLowerCase(), id]
+        );
+        if (existing.rows.length > 0) {
+          return NextResponse.json(
+            { error: "Cet email est deja utilise par un autre utilisateur" },
+            { status: 400, headers: corsHeaders }
+          );
+        }
+
+        updates.push(`email = $${paramIndex}`);
+        values.push(email.trim().toLowerCase());
+        paramIndex++;
+      }
+
+      if (updates.length > 0) {
+        values.push(id);
+        await pool.query(
+          `UPDATE users SET ${updates.join(", ")} WHERE id = $${paramIndex}`,
+          values
+        );
+      }
+    }
+
+    // Mettre a jour le mot de passe si fourni
+    if (password) {
+      if (password.length < 6) {
+        return NextResponse.json(
+          { error: "Le mot de passe doit contenir au moins 6 caracteres" },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      const passwordHash = await hashPassword(password);
+      await pool.query(
+        "UPDATE users SET password_hash = $1 WHERE id = $2",
+        [passwordHash, id]
+      );
+    }
+
+    return NextResponse.json({ ok: true }, { headers: corsHeaders });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status, headers: corsHeaders }
+      );
+    }
+    console.error("Erreur PUT /api/drivers:", error);
+    return NextResponse.json(
+      { error: "Erreur modification chauffeur : " + String(error) },
+      { status: 500, headers: corsHeaders }
+    );
+  }
 }
 
 // DELETE : supprimer un chauffeur
 export async function DELETE(req: NextRequest) {
-  const { id } = await req.json();
+  try {
+    requireAdmin(req);
 
-  if (!id) {
-    return NextResponse.json({ error: "ID requis" }, { status: 400 });
-  }
+    const { id } = await req.json();
 
-  // Supprimer l'utilisateur de Supabase Auth (supprime aussi le profil via cascade ou on le fait manuellement)
-  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID requis" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
 
-  if (authError) {
+    // Verifier que l'utilisateur existe et est bien un driver
+    const check = await pool.query(
+      "SELECT id, role FROM users WHERE id = $1",
+      [id]
+    );
+
+    if (check.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Chauffeur introuvable" },
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
+    if (check.rows[0].role !== "driver") {
+      return NextResponse.json(
+        { error: "Impossible de supprimer un utilisateur qui n'est pas chauffeur" },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Supprimer le chauffeur
+    await pool.query("DELETE FROM users WHERE id = $1", [id]);
+
+    return NextResponse.json({ ok: true }, { headers: corsHeaders });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status, headers: corsHeaders }
+      );
+    }
+    console.error("Erreur DELETE /api/drivers:", error);
     return NextResponse.json(
-      { error: "Erreur suppression : " + authError.message },
-      { status: 500 }
+      { error: "Erreur suppression chauffeur : " + String(error) },
+      { status: 500, headers: corsHeaders }
     );
   }
-
-  // Supprimer le profil
-  await supabaseAdmin.from("profiles").delete().eq("id", id);
-
-  return NextResponse.json({ ok: true });
 }

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
+import '../services/api_service.dart';
 import '../services/connectivity_service.dart';
 import 'home_screen.dart';
 
 // ============================================================
-// ÉCRAN DE CONNEXION (LIVREUR)
-// Email + Mot de passe -> Supabase Auth
+// ECRAN DE CONNEXION (LIVREUR)
+// Email + Mot de passe -> API REST /api/auth/login
 // ============================================================
 
 class LoginScreen extends StatefulWidget {
@@ -22,9 +22,9 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   Future<void> _login() async {
-    // Vérifier la connexion
+    // Verifier la connexion
     if (!await ConnectivityService.isConnected()) {
-      setState(() => _error = 'Connexion requise. Vérifiez votre connexion internet.');
+      setState(() => _error = 'Connexion requise. Verifiez votre connexion internet.');
       return;
     }
 
@@ -34,10 +34,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Connexion via Supabase Auth
-      await supabase.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      // Connexion via l'API REST
+      await ApiService.login(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
 
       // Rediriger vers l'accueil

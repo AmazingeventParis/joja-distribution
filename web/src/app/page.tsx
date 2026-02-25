@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 // Types
 interface DeliveryNote {
@@ -15,72 +14,75 @@ interface DeliveryNote {
   validated_at: string;
   created_at: string;
   driver_id: string;
-  profiles?: { name: string };
+  driver_name: string | null;
 }
 
-// Page principale : liste des BDL avec filtres
+// Page principale : liste des BDL avec filtres - utilise l'API REST
 export default function HomePage() {
   const router = useRouter();
   const [bdls, setBdls] = useState<DeliveryNote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ id: string } | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
 
   // Filtres
   const [filterClient, setFilterClient] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterDate, setFilterDate] = useState("");
 
-  // Vérifier l'authentification au chargement
+  // Verifier l'authentification au chargement
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
+    fetch("/api/auth/me")
+      .then((res) => {
+        if (!res.ok) {
+          router.push("/login");
+        } else {
+          setAuthenticated(true);
+          loadBdls();
+        }
+      })
+      .catch(() => {
         router.push("/login");
-      } else {
-        setUser(data.user);
-        loadBdls();
-      }
-    });
+      });
   }, [router]);
 
-  // Charger les BDL depuis Supabase
+  // Charger les BDL depuis l'API REST
   const loadBdls = async () => {
     setLoading(true);
 
-    let query = supabase
-      .from("delivery_notes")
-      .select("*, profiles(name)")
-      .order("created_at", { ascending: false });
+    // Construire les parametres de requete
+    const params = new URLSearchParams();
+    if (filterClient) params.set("client_name", filterClient);
+    if (filterStatus) params.set("status", filterStatus);
+    if (filterDate) params.set("date", filterDate);
 
-    // Appliquer les filtres
-    if (filterClient) {
-      query = query.ilike("client_name", `%${filterClient}%`);
-    }
-    if (filterStatus) {
-      query = query.eq("status", filterStatus);
-    }
-    if (filterDate) {
-      query = query.gte("created_at", filterDate + "T00:00:00");
-      query = query.lte("created_at", filterDate + "T23:59:59");
+    const queryString = params.toString();
+    const url = `/api/delivery-notes${queryString ? `?${queryString}` : ""}`;
+
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setBdls(Array.isArray(data) ? data : []);
+      } else {
+        console.error("Erreur chargement BDL:", res.statusText);
+        setBdls([]);
+      }
+    } catch (err) {
+      console.error("Erreur chargement BDL:", err);
+      setBdls([]);
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Erreur chargement BDL:", error);
-    } else {
-      setBdls(data || []);
-    }
     setLoading(false);
   };
 
   // Recharger quand les filtres changent
   useEffect(() => {
-    if (user) loadBdls();
-  }, [filterClient, filterStatus, filterDate, user]);
+    if (authenticated) loadBdls();
+  }, [filterClient, filterStatus, filterDate, authenticated]);
 
-  // Déconnexion
+  // Deconnexion via l'API REST
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   };
 
@@ -96,15 +98,15 @@ export default function HomePage() {
     }
   };
 
-  // Libellé du statut en français
+  // Libelle du statut en francais
   const statusLabel = (status: string) => {
     switch (status) {
       case "EMAIL_SENT":
-        return "Email envoyé";
+        return "Email envoy\u00e9";
       case "EMAIL_FAILED":
-        return "Email échoué";
+        return "Email \u00e9chou\u00e9";
       default:
-        return "Validé";
+        return "Valid\u00e9";
     }
   };
 
@@ -186,7 +188,7 @@ export default function HomePage() {
             fontWeight: 600,
           }}
         >
-          Déconnexion
+          D\u00e9connexion
         </button>
       </div>
 
@@ -225,9 +227,9 @@ export default function HomePage() {
           }}
         >
           <option value="">Tous les statuts</option>
-          <option value="VALIDATED">Validé</option>
-          <option value="EMAIL_SENT">Email envoyé</option>
-          <option value="EMAIL_FAILED">Email échoué</option>
+          <option value="VALIDATED">Valid\u00e9</option>
+          <option value="EMAIL_SENT">Email envoy\u00e9</option>
+          <option value="EMAIL_FAILED">Email \u00e9chou\u00e9</option>
         </select>
 
         <input
@@ -258,7 +260,7 @@ export default function HomePage() {
             fontSize: 14,
           }}
         >
-          Réinitialiser
+          R\u00e9initialiser
         </button>
       </div>
 
@@ -277,7 +279,7 @@ export default function HomePage() {
           </p>
         ) : bdls.length === 0 ? (
           <p style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
-            Aucun bon de livraison trouvé
+            Aucun bon de livraison trouv\u00e9
           </p>
         ) : (
           <table
@@ -289,7 +291,7 @@ export default function HomePage() {
           >
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
-                <th style={{ padding: 12, textAlign: "left" }}>N° BDL</th>
+                <th style={{ padding: 12, textAlign: "left" }}>N\u00b0 BDL</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Client</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Livreur</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Date</th>
@@ -314,7 +316,7 @@ export default function HomePage() {
                     </td>
                     <td style={{ padding: 12 }}>{bdl.client_name}</td>
                     <td style={{ padding: 12 }}>
-                      {(bdl as unknown as { profiles: { name: string } }).profiles?.name || "-"}
+                      {bdl.driver_name || "-"}
                     </td>
                     <td style={{ padding: 12 }}>
                       {new Date(bdl.validated_at).toLocaleDateString("fr-FR")}

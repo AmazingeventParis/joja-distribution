@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 interface Driver {
   id: string;
@@ -12,6 +11,7 @@ interface Driver {
   created_at: string;
 }
 
+// Page gestion des chauffeurs - utilise l'API REST
 export default function ChauffeursPage() {
   const router = useRouter();
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -41,15 +41,19 @@ export default function ChauffeursPage() {
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showFormPassword, setShowFormPassword] = useState(false);
 
-  // Vérifier l'authentification
+  // Verifier l'authentification via l'API REST
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
+    fetch("/api/auth/me")
+      .then((res) => {
+        if (!res.ok) {
+          router.push("/login");
+        } else {
+          loadDrivers();
+        }
+      })
+      .catch(() => {
         router.push("/login");
-      } else {
-        loadDrivers();
-      }
-    });
+      });
   }, [router]);
 
   // Charger la liste des chauffeurs
@@ -67,7 +71,7 @@ export default function ChauffeursPage() {
     setLoading(false);
   };
 
-  // Créer un chauffeur
+  // Creer un chauffeur
   const handleCreate = async () => {
     setFormError("");
     setFormSuccess("");
@@ -102,7 +106,7 @@ export default function ChauffeursPage() {
         loadDrivers();
       }
     } catch (e) {
-      setFormError("Erreur réseau : " + String(e));
+      setFormError("Erreur r\u00e9seau : " + String(e));
     }
     setFormLoading(false);
   };
@@ -171,19 +175,19 @@ export default function ChauffeursPage() {
       if (!res.ok) {
         setEditError(data.error || "Erreur inconnue");
       } else {
-        setEditSuccess("Chauffeur modifié avec succès !");
+        setEditSuccess("Chauffeur modifi\u00e9 avec succ\u00e8s !");
         loadDrivers();
         setTimeout(() => setEditDriver(null), 1200);
       }
     } catch (e) {
-      setEditError("Erreur réseau : " + String(e));
+      setEditError("Erreur r\u00e9seau : " + String(e));
     }
     setEditLoading(false);
   };
 
-  // Déconnexion
+  // Deconnexion via l'API REST
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   };
 
@@ -265,7 +269,7 @@ export default function ChauffeursPage() {
             fontWeight: 600,
           }}
         >
-          Déconnexion
+          D\u00e9connexion
         </button>
       </div>
 
@@ -387,7 +391,7 @@ export default function ChauffeursPage() {
                   type={showFormPassword ? "text" : "password"}
                   value={formPassword}
                   onChange={(e) => setFormPassword(e.target.value)}
-                  placeholder="Min. 6 caractères"
+                  placeholder="Min. 6 caract\u00e8res"
                   style={{
                     width: "100%",
                     padding: 10,
@@ -436,7 +440,7 @@ export default function ChauffeursPage() {
                 fontSize: 14,
               }}
             >
-              {formLoading ? "Création en cours..." : "Créer le chauffeur"}
+              {formLoading ? "Cr\u00e9ation en cours..." : "Cr\u00e9er le chauffeur"}
             </button>
           </div>
         </div>
@@ -457,7 +461,7 @@ export default function ChauffeursPage() {
           </p>
         ) : drivers.length === 0 ? (
           <p style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
-            Aucun chauffeur enregistré
+            Aucun chauffeur enregistr\u00e9
           </p>
         ) : (
           <table
@@ -471,7 +475,7 @@ export default function ChauffeursPage() {
               <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
                 <th style={{ padding: 12, textAlign: "left" }}>Nom</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Email</th>
-                <th style={{ padding: 12, textAlign: "left" }}>Date de création</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Date de cr\u00e9ation</th>
                 <th style={{ padding: 12, textAlign: "center" }}>Actions</th>
               </tr>
             </thead>
@@ -649,7 +653,7 @@ export default function ChauffeursPage() {
                   type={showEditPassword ? "text" : "password"}
                   value={editPassword}
                   onChange={(e) => setEditPassword(e.target.value)}
-                  placeholder="Min. 6 caractères"
+                  placeholder="Min. 6 caract\u00e8res"
                   style={{ width: "100%", padding: 10, paddingRight: 70, borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box" }}
                 />
                 <button

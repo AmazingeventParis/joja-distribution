@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 // Types
 interface DeliveryNote {
@@ -17,6 +16,7 @@ interface DeliveryNote {
   status: string;
   validated_at: string;
   driver_id: string;
+  driver_name: string | null;
 }
 
 interface EmailLog {
@@ -27,70 +27,50 @@ interface EmailLog {
   created_at: string;
 }
 
-// Page détail d'un Bon de Livraison
+// Page detail d'un Bon de Livraison - utilise l'API REST
 export default function BdlDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
 
   const [bdl, setBdl] = useState<DeliveryNote | null>(null);
-  const [driverName, setDriverName] = useState("");
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
 
-  // Charger les données du BDL
+  // Charger les donnees du BDL
   useEffect(() => {
     const load = async () => {
-      // Vérifier l'authentification
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
+      // Verifier l'authentification via l'API REST
+      const authRes = await fetch("/api/auth/me");
+      if (!authRes.ok) {
         router.push("/login");
         return;
       }
 
-      // Charger le BDL
-      const { data: bdlData, error } = await supabase
-        .from("delivery_notes")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (error || !bdlData) {
+      // Charger le BDL (l'API retourne driver_name directement)
+      const bdlRes = await fetch(`/api/delivery-notes/${id}`);
+      if (!bdlRes.ok) {
         alert("BDL introuvable");
         router.push("/");
         return;
       }
 
+      const bdlData = await bdlRes.json();
       setBdl(bdlData);
 
-      // Charger le nom du livreur
-      const { data: driver } = await supabase
-        .from("profiles")
-        .select("name")
-        .eq("id", bdlData.driver_id)
-        .single();
-
-      setDriverName(driver?.name || "Inconnu");
-
       // Charger les logs email
-      const { data: logs } = await supabase
-        .from("email_logs")
-        .select("*")
-        .eq("delivery_note_id", id)
-        .order("created_at", { ascending: false });
+      const logsRes = await fetch(`/api/email-logs?delivery_note_id=${id}`);
+      if (logsRes.ok) {
+        const logsData = await logsRes.json();
+        setEmailLogs(Array.isArray(logsData) ? logsData : []);
+      }
 
-      setEmailLogs(logs || []);
-
-      // URL signée pour la signature
+      // URL de la signature (servie directement par l'API, authentifiee par cookie)
       if (bdlData.signature_path) {
-        const { data: signedData } = await supabase.storage
-          .from("signatures")
-          .createSignedUrl(bdlData.signature_path, 3600);
-
-        if (signedData) setSignatureUrl(signedData.signedUrl);
+        setSignatureUrl(`/api/files/signatures/${bdlData.signature_path}`);
       }
 
       setLoading(false);
@@ -99,49 +79,39 @@ export default function BdlDetailPage() {
     load();
   }, [id, router]);
 
-  // Télécharger / aperçu du PDF
-  const handleDownloadPdf = async () => {
+  // Telecharger / apercu du PDF via l'API REST
+  const handleDownloadPdf = () => {
     if (!bdl?.pdf_path) {
       alert("Aucun PDF disponible");
       return;
     }
-
-    const { data } = await supabase.storage
-      .from("pdfs")
-      .createSignedUrl(bdl.pdf_path, 3600);
-
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, "_blank");
-    }
+    // Ouvrir le PDF dans un nouvel onglet (authentifie par cookie)
+    window.open(`/api/files/pdfs/${bdl.pdf_path}`, "_blank");
   };
 
-  // Retry envoi email (rappeler l'Edge Function)
+  // Retry envoi email via l'API REST /api/generate-pdf
   const handleRetry = async () => {
     if (!bdl) return;
     setRetrying(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate_and_email_pdf`,
-      {
+    try {
+      const response = await fetch("/api/generate-pdf", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ delivery_note_id: bdl.id }),
+      });
+
+      const result = await response.json();
+
+      if (result.ok) {
+        alert(`Email renvoy\u00e9 avec succ\u00e8s ! Statut: ${result.email_status}`);
+        // Recharger la page
+        window.location.reload();
+      } else {
+        alert(`Erreur: ${result.error}`);
       }
-    );
-
-    const result = await response.json();
-
-    if (result.ok) {
-      alert(`Email renvoyé avec succès ! Statut: ${result.email_status}`);
-      // Recharger la page
-      window.location.reload();
-    } else {
-      alert(`Erreur: ${result.error}`);
+    } catch (err) {
+      alert(`Erreur r\u00e9seau : ${err}`);
     }
 
     setRetrying(false);
@@ -151,11 +121,11 @@ export default function BdlDetailPage() {
   const handleSendToClient = async () => {
     if (!bdl) return;
     if (!bdl.client_email) {
-      alert("Aucun email client renseigné pour ce BDL");
+      alert("Aucun email client renseign\u00e9 pour ce BDL");
       return;
     }
     if (!bdl.pdf_path) {
-      alert("Aucun PDF disponible. Veuillez d'abord regénérer le PDF.");
+      alert("Aucun PDF disponible. Veuillez d'abord reg\u00e9n\u00e9rer le PDF.");
       return;
     }
 
@@ -171,13 +141,13 @@ export default function BdlDetailPage() {
       const result = await response.json();
 
       if (result.ok) {
-        alert(`Email envoyé avec succès à ${bdl.client_email} !`);
+        alert(`Email envoy\u00e9 avec succ\u00e8s \u00e0 ${bdl.client_email} !`);
         window.location.reload();
       } else {
         alert(`Erreur : ${result.error}`);
       }
     } catch (err) {
-      alert(`Erreur réseau : ${err}`);
+      alert(`Erreur r\u00e9seau : ${err}`);
     }
 
     setSendingToClient(false);
@@ -225,10 +195,10 @@ export default function BdlDetailPage() {
           fontSize: 14,
         }}
       >
-        Retour à la liste
+        Retour \u00e0 la liste
       </button>
 
-      {/* En-tête */}
+      {/* En-tete */}
       <div
         style={{
           background: "white",
@@ -260,10 +230,10 @@ export default function BdlDetailPage() {
             }}
           >
             {bdl.status === "EMAIL_SENT"
-              ? "Email envoyé"
+              ? "Email envoy\u00e9"
               : bdl.status === "EMAIL_FAILED"
-              ? "Email échoué"
-              : "Validé"}
+              ? "Email \u00e9chou\u00e9"
+              : "Valid\u00e9"}
           </span>
         </div>
 
@@ -278,7 +248,7 @@ export default function BdlDetailPage() {
         >
           <div>
             <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>
-              CLIENT / SOCIÉTÉ
+              CLIENT / SOCI\u00c9T\u00c9
             </label>
             <p style={{ margin: "4px 0 0", fontSize: 16 }}>{bdl.client_name}</p>
           </div>
@@ -287,7 +257,7 @@ export default function BdlDetailPage() {
               EMAIL CLIENT
             </label>
             <p style={{ margin: "4px 0 0", fontSize: 16 }}>
-              {bdl.client_email || "Non renseigné"}
+              {bdl.client_email || "Non renseign\u00e9"}
             </p>
           </div>
           <div>
@@ -300,7 +270,7 @@ export default function BdlDetailPage() {
             <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>
               LIVREUR
             </label>
-            <p style={{ margin: "4px 0 0", fontSize: 16 }}>{driverName}</p>
+            <p style={{ margin: "4px 0 0", fontSize: 16 }}>{bdl.driver_name || "Inconnu"}</p>
           </div>
           <div>
             <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>
@@ -312,10 +282,10 @@ export default function BdlDetailPage() {
           </div>
         </div>
 
-        {/* Détails livraison */}
+        {/* Details livraison */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>
-            DÉTAILS DE LA LIVRAISON
+            D\u00c9TAILS DE LA LIVRAISON
           </label>
           <div
             style={{
@@ -370,7 +340,7 @@ export default function BdlDetailPage() {
               fontSize: 14,
             }}
           >
-            Télécharger le PDF
+            T\u00e9l\u00e9charger le PDF
           </button>
 
           {bdl.status === "EMAIL_FAILED" && (
@@ -414,10 +384,10 @@ export default function BdlDetailPage() {
             }}
             title={
               !bdl.client_email
-                ? "Aucun email client renseigné"
+                ? "Aucun email client renseign\u00e9"
                 : !bdl.pdf_path
                 ? "Aucun PDF disponible"
-                : `Envoyer le PDF à ${bdl.client_email}`
+                : `Envoyer le PDF \u00e0 ${bdl.client_email}`
             }
           >
             {sendingToClient
@@ -441,7 +411,7 @@ export default function BdlDetailPage() {
         </h2>
 
         {emailLogs.length === 0 ? (
-          <p style={{ color: "#9ca3af" }}>Aucun email envoyé</p>
+          <p style={{ color: "#9ca3af" }}>Aucun email envoy\u00e9</p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
@@ -469,7 +439,7 @@ export default function BdlDetailPage() {
                           fontWeight: 600,
                         }}
                       >
-                        {log.status === "sent" ? "Envoyé" : "Échoué"}
+                        {log.status === "sent" ? "Envoy\u00e9" : "\u00c9chou\u00e9"}
                       </span>
                     </td>
                     <td style={{ padding: 8, color: "#ef4444", fontSize: 12 }}>

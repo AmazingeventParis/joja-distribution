@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
+import '../services/api_service.dart';
 import 'create_bdl_screen.dart';
 import 'history_screen.dart';
 import 'login_screen.dart';
 
 // ============================================================
-// ÉCRAN D'ACCUEIL (LIVREUR)
-// Navigation vers : Créer un BDL / Historique
+// ECRAN D'ACCUEIL (LIVREUR)
+// Navigation vers : Creer un BDL / Historique
 // ============================================================
 
 class HomeScreen extends StatelessWidget {
@@ -18,11 +18,11 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('JOJA DISTRIBUTION'),
         actions: [
-          // Bouton déconnexion
+          // Bouton deconnexion
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await supabase.auth.signOut();
+              await ApiService.logout();
               if (context.mounted) {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -54,7 +54,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 48),
 
-            // Bouton : Créer un BDL
+            // Bouton : Creer un BDL
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -66,7 +66,7 @@ class HomeScreen extends StatelessWidget {
                 },
                 icon: const Icon(Icons.add_circle, size: 28),
                 label: const Text(
-                  'CRÉER UN BON DE LIVRAISON',
+                  'CREER UN BON DE LIVRAISON',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(

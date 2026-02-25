@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../main.dart';
+import '../services/api_service.dart';
 import '../services/connectivity_service.dart';
 
 // ============================================================
-// ÉCRAN HISTORIQUE DES BDL (LIVREUR)
+// ECRAN HISTORIQUE DES BDL (LIVREUR)
 // Liste de ses bons de livraison avec statut email
-// Clic = détail + téléchargement PDF
+// Clic = detail + telechargement PDF
 // ============================================================
 
 class HistoryScreen extends StatefulWidget {
@@ -26,7 +26,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _loadBdls();
   }
 
-  // Charger les BDL du livreur connecté
+  // Charger les BDL du livreur connecte
   Future<void> _loadBdls() async {
     if (!await ConnectivityService.isConnected()) {
       if (mounted) {
@@ -41,18 +41,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return;
     }
 
-    final userId = supabase.auth.currentUser!.id;
-
-    final response = await supabase
-        .from('delivery_notes')
-        .select('*')
-        .eq('driver_id', userId)
-        .order('created_at', ascending: false);
-
-    setState(() {
-      _bdls = List<Map<String, dynamic>>.from(response);
-      _loading = false;
-    });
+    try {
+      final bdls = await ApiService.getMyDeliveryNotes();
+      setState(() {
+        _bdls = bdls;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Erreur chargement BDL: $e');
+      setState(() => _loading = false);
+    }
   }
 
   // Couleur du badge de statut
@@ -67,19 +65,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  // Libellé du statut
+  // Libelle du statut
   String _statusLabel(String status) {
     switch (status) {
       case 'EMAIL_SENT':
-        return 'Email envoyé';
+        return 'Email envoye';
       case 'EMAIL_FAILED':
-        return 'Email échoué';
+        return 'Email echoue';
       default:
-        return 'Validé';
+        return 'Valide';
     }
   }
 
-  // Ouvrir le PDF via URL signée
+  // Ouvrir le PDF via URL avec token
   Future<void> _downloadPdf(Map<String, dynamic> bdl) async {
     final pdfPath = bdl['pdf_path'];
     if (pdfPath == null) {
@@ -92,13 +90,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return;
     }
 
-    // Générer une URL signée (valable 1 heure)
-    final response = await supabase.storage
-        .from('pdfs')
-        .createSignedUrl(pdfPath, 3600);
-
-    if (response.isNotEmpty) {
-      await launchUrl(Uri.parse(response), mode: LaunchMode.externalApplication);
+    try {
+      // Construire l'URL avec le token pour l'authentification
+      final url = await ApiService.getPdfDownloadUrl(pdfPath);
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -150,7 +154,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             padding: const EdgeInsets.all(16),
                             child: Row(
                               children: [
-                                // Icône statut
+                                // Icone statut
                                 Container(
                                   width: 44,
                                   height: 44,
@@ -225,7 +229,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // Afficher le détail d'un BDL dans un bottom sheet
+  // Afficher le detail d'un BDL dans un bottom sheet
   void _showDetail(Map<String, dynamic> bdl) {
     showModalBottomSheet(
       context: context,
@@ -244,7 +248,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Barre de poignée
+              // Barre de poignee
               Center(
                 child: Container(
                   width: 40,
@@ -257,7 +261,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Numéro BDL
+              // Numero BDL
               Text(
                 bdl['bdl_number'] ?? '',
                 style: const TextStyle(
@@ -269,12 +273,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 16),
 
               _detailRow('Client', bdl['client_name']),
-              _detailRow('Email', bdl['client_email'] ?? 'Non renseigné'),
+              _detailRow('Email', bdl['client_email'] ?? 'Non renseigne'),
               _detailRow('Adresse', bdl['address']),
               const SizedBox(height: 12),
 
               const Text(
-                'Détails livraison',
+                'Details livraison',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
@@ -296,7 +300,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               _detailRow('Statut', _statusLabel(bdl['status'])),
               const SizedBox(height: 24),
 
-              // Bouton télécharger PDF
+              // Bouton telecharger PDF
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -304,7 +308,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   onPressed: () => _downloadPdf(bdl),
                   icon: const Icon(Icons.picture_as_pdf),
                   label: const Text(
-                    'TÉLÉCHARGER LE PDF',
+                    'TELECHARGER LE PDF',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -323,7 +327,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // Widget helper : ligne de détail
+  // Widget helper : ligne de detail
   Widget _detailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

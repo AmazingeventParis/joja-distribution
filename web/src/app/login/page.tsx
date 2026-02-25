@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
-// Page de connexion admin
+// Page de connexion admin - utilise l'API REST /api/auth/login
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -18,40 +17,28 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    // Connexion avec Supabase Auth
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // Connexion via l'API REST (pose le cookie joja_token)
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (authError) {
-      setError("Erreur connexion : " + authError.message);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Erreur de connexion");
+        setLoading(false);
+        return;
+      }
+
+      // Connexion reussie, rediriger vers l'accueil
+      router.push("/");
+    } catch (err) {
+      setError("Erreur reseau : " + String(err));
       setLoading(false);
-      return;
     }
-
-    // Vérifier que c'est un admin
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
-
-    if (profileError) {
-      setError("Erreur profil : " + profileError.message);
-      await supabase.auth.signOut();
-      setLoading(false);
-      return;
-    }
-
-    if (!profile || profile.role !== "admin") {
-      setError("Accès réservé aux administrateurs (rôle: " + (profile?.role || "aucun") + ")");
-      await supabase.auth.signOut();
-      setLoading(false);
-      return;
-    }
-
-    router.push("/");
   };
 
   return (
