@@ -104,7 +104,7 @@ export default function ClientsPage() {
         loadClients();
       }
     } catch (e) {
-      setFormError("Erreur r\u00e9seau : " + String(e));
+      setFormError("Erreur réseau : " + String(e));
     }
     setFormLoading(false);
   };
@@ -248,7 +248,7 @@ export default function ClientsPage() {
             fontWeight: 600,
           }}
         >
-          D\u00e9connexion
+          Déconnexion
         </button>
       </div>
 
@@ -397,7 +397,7 @@ export default function ClientsPage() {
                 fontSize: 14,
               }}
             >
-              {formLoading ? "Cr\u00e9ation en cours..." : "Cr\u00e9er le client"}
+              {formLoading ? "Création en cours..." : "Créer le client"}
             </button>
           </div>
         </div>
@@ -418,7 +418,7 @@ export default function ClientsPage() {
           </p>
         ) : clients.length === 0 ? (
           <p style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
-            Aucun client enregistr\u00e9
+            Aucun client enregistré
           </p>
         ) : (
           <table
@@ -433,7 +433,7 @@ export default function ClientsPage() {
                 <th style={{ padding: 12, textAlign: "left" }}>Nom</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Email</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Adresse</th>
-                <th style={{ padding: 12, textAlign: "left" }}>Date de cr\u00e9ation</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Date de création</th>
                 <th style={{ padding: 12, textAlign: "center" }}>Actions</th>
               </tr>
             </thead>

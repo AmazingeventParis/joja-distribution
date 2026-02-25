@@ -102,11 +102,11 @@ export default function HomePage() {
   const statusLabel = (status: string) => {
     switch (status) {
       case "EMAIL_SENT":
-        return "Email envoy\u00e9";
+        return "Email envoyé";
       case "EMAIL_FAILED":
-        return "Email \u00e9chou\u00e9";
+        return "Email échoué";
       default:
-        return "Valid\u00e9";
+        return "Validé";
     }
   };
 
@@ -188,7 +188,7 @@ export default function HomePage() {
             fontWeight: 600,
           }}
         >
-          D\u00e9connexion
+          Déconnexion
         </button>
       </div>
 
@@ -227,9 +227,9 @@ export default function HomePage() {
           }}
         >
           <option value="">Tous les statuts</option>
-          <option value="VALIDATED">Valid\u00e9</option>
-          <option value="EMAIL_SENT">Email envoy\u00e9</option>
-          <option value="EMAIL_FAILED">Email \u00e9chou\u00e9</option>
+          <option value="VALIDATED">Validé</option>
+          <option value="EMAIL_SENT">Email envoyé</option>
+          <option value="EMAIL_FAILED">Email échoué</option>
         </select>
 
         <input
@@ -260,7 +260,7 @@ export default function HomePage() {
             fontSize: 14,
           }}
         >
-          R\u00e9initialiser
+          Réinitialiser
         </button>
       </div>
 
@@ -279,7 +279,7 @@ export default function HomePage() {
           </p>
         ) : bdls.length === 0 ? (
           <p style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
-            Aucun bon de livraison trouv\u00e9
+            Aucun bon de livraison trouvé
           </p>
         ) : (
           <table
@@ -291,7 +291,7 @@ export default function HomePage() {
           >
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
-                <th style={{ padding: 12, textAlign: "left" }}>N\u00b0 BDL</th>
+                <th style={{ padding: 12, textAlign: "left" }}>N° BDL</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Client</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Livreur</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Date</th>

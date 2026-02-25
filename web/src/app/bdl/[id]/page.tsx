@@ -104,14 +104,14 @@ export default function BdlDetailPage() {
       const result = await response.json();
 
       if (result.ok) {
-        alert(`Email renvoy\u00e9 avec succ\u00e8s ! Statut: ${result.email_status}`);
+        alert(`Email renvoyé avec succès ! Statut: ${result.email_status}`);
         // Recharger la page
         window.location.reload();
       } else {
         alert(`Erreur: ${result.error}`);
       }
     } catch (err) {
-      alert(`Erreur r\u00e9seau : ${err}`);
+      alert(`Erreur réseau : ${err}`);
     }
 
     setRetrying(false);
@@ -121,11 +121,11 @@ export default function BdlDetailPage() {
   const handleSendToClient = async () => {
     if (!bdl) return;
     if (!bdl.client_email) {
-      alert("Aucun email client renseign\u00e9 pour ce BDL");
+      alert("Aucun email client renseigné pour ce BDL");
       return;
     }
     if (!bdl.pdf_path) {
-      alert("Aucun PDF disponible. Veuillez d'abord reg\u00e9n\u00e9rer le PDF.");
+      alert("Aucun PDF disponible. Veuillez d'abord regénérer le PDF.");
       return;
     }
 
@@ -141,13 +141,13 @@ export default function BdlDetailPage() {
       const result = await response.json();
 
       if (result.ok) {
-        alert(`Email envoy\u00e9 avec succ\u00e8s \u00e0 ${bdl.client_email} !`);
+        alert(`Email envoyé avec succès à ${bdl.client_email} !`);
         window.location.reload();
       } else {
         alert(`Erreur : ${result.error}`);
       }
     } catch (err) {
-      alert(`Erreur r\u00e9seau : ${err}`);
+      alert(`Erreur réseau : ${err}`);
     }
 
     setSendingToClient(false);
@@ -195,7 +195,7 @@ export default function BdlDetailPage() {
           fontSize: 14,
         }}
       >
-        Retour \u00e0 la liste
+        Retour à la liste
       </button>
 
       {/* En-tete */}
@@ -230,10 +230,10 @@ export default function BdlDetailPage() {
             }}
           >
             {bdl.status === "EMAIL_SENT"
-              ? "Email envoy\u00e9"
+              ? "Email envoyé"
               : bdl.status === "EMAIL_FAILED"
-              ? "Email \u00e9chou\u00e9"
-              : "Valid\u00e9"}
+              ? "Email échoué"
+              : "Validé"}
           </span>
         </div>
 
@@ -248,7 +248,7 @@ export default function BdlDetailPage() {
         >
           <div>
             <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>
-              CLIENT / SOCI\u00c9T\u00c9
+              CLIENT / SOCIÉTÉ
             </label>
             <p style={{ margin: "4px 0 0", fontSize: 16 }}>{bdl.client_name}</p>
           </div>
@@ -257,7 +257,7 @@ export default function BdlDetailPage() {
               EMAIL CLIENT
             </label>
             <p style={{ margin: "4px 0 0", fontSize: 16 }}>
-              {bdl.client_email || "Non renseign\u00e9"}
+              {bdl.client_email || "Non renseigné"}
             </p>
           </div>
           <div>
@@ -285,7 +285,7 @@ export default function BdlDetailPage() {
         {/* Details livraison */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>
-            D\u00c9TAILS DE LA LIVRAISON
+            DÉTAILS DE LA LIVRAISON
           </label>
           <div
             style={{
@@ -340,7 +340,7 @@ export default function BdlDetailPage() {
               fontSize: 14,
             }}
           >
-            T\u00e9l\u00e9charger le PDF
+            Télécharger le PDF
           </button>
 
           {bdl.status === "EMAIL_FAILED" && (
@@ -384,10 +384,10 @@ export default function BdlDetailPage() {
             }}
             title={
               !bdl.client_email
-                ? "Aucun email client renseign\u00e9"
+                ? "Aucun email client renseigné"
                 : !bdl.pdf_path
                 ? "Aucun PDF disponible"
-                : `Envoyer le PDF \u00e0 ${bdl.client_email}`
+                : `Envoyer le PDF à ${bdl.client_email}`
             }
           >
             {sendingToClient
@@ -411,7 +411,7 @@ export default function BdlDetailPage() {
         </h2>
 
         {emailLogs.length === 0 ? (
-          <p style={{ color: "#9ca3af" }}>Aucun email envoy\u00e9</p>
+          <p style={{ color: "#9ca3af" }}>Aucun email envoyé</p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
@@ -439,7 +439,7 @@ export default function BdlDetailPage() {
                           fontWeight: 600,
                         }}
                       >
-                        {log.status === "sent" ? "Envoy\u00e9" : "\u00c9chou\u00e9"}
+                        {log.status === "sent" ? "Envoyé" : "Échoué"}
                       </span>
                     </td>
                     <td style={{ padding: 8, color: "#ef4444", fontSize: 12 }}>
