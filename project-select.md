@@ -239,11 +239,13 @@ Toutes les routes incluent des headers CORS pour l'acces mobile.
 ---
 
 ## Email envoye
-- **From** : `JOJA DISTRIBUTION <onboarding@resend.dev>` (mode test)
-- **To** : `joy.slama@gmail.com` + client_email (si renseigne)
+- **Domaine** : `swipego.app` (verifie sur Resend, DNS SPF+DKIM+DMARC configures sur OVH)
+- **From** : `JOJA DISTRIBUTION <noreply@swipego.app>`
+- **To** : `joy.slama@gmail.com` (toujours) + client_email (si renseigne)
 - **Sujet** : `Bon de Livraison BDL-YYYYMMDD-XXXXX - JOJA DISTRIBUTION`
 - **Corps** : HTML avec resume (client, adresse, date, livreur)
 - **Piece jointe** : le PDF en base64
+- **Peut envoyer a n'importe quelle adresse** (domaine verifie, plus de restriction mode test)
 
 ---
 
@@ -293,15 +295,14 @@ Toutes les routes incluent des headers CORS pour l'acces mobile.
 - Pas de gestion multi-societe
 - Pas de gestion des produits/articles (texte libre)
 - Pas de modification d'un BDL apres validation
-- Email depuis onboarding@resend.dev (domaine test) → besoin de verifier un domaine
 - Pas de pagination sur la liste des BDL
-- Volume Docker non monte → fichiers uploades perdus au redeploiement
+- Volume Docker non monte par Coolify (nixpacks) → fichiers uploades perdus au redeploiement
   (les fichiers statiques dans web/public/ sont OK car inclus dans le build)
+  (l'APK est dans web/public/apk/ donc persiste)
 
 ---
 
 ## Evolutions possibles
-- Verifier un domaine sur Resend pour envoyer a n'importe quelle adresse
 - Ajout de lignes produits avec quantites et prix
 - Mode offline avec synchronisation locale
 - Tableau de bord avec statistiques

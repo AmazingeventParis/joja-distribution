@@ -231,8 +231,30 @@ ssh ubuntu@217.182.89.133 "sudo docker logs --tail 100 $(sudo docker ps -q --fil
 - [x] Verifie : les utilisateurs JOJA n'apparaissent plus dans admin.swipego.app
 - [x] JOJA est 100% independant
 
+### Session 6 (suite) - APK + Admin + Resend
+- [x] Flutter + Java 17 + Android SDK installes sur le serveur OVH
+- [x] APK builde sur le serveur (14.8MB) et servi en statique : /apk/joja-distribution.apk
+- [x] Carte JOJA ajoutee sur admin.swipego.app (section Applications + Claude/IA)
+- [x] Bouton "Android APK" avec date de build dans la carte JOJA
+- [x] Projet clone dans code-server (/home/coder/projects/joja-distribution)
+- [x] Domaine swipego.app verifie sur Resend (SPF + DKIM + DMARC sur OVH)
+- [x] Emails envoyes depuis noreply@swipego.app → fonctionne vers n'importe quelle adresse
+
+## Email (Resend)
+- **Domaine** : `swipego.app` (verifie, status: verified, sending: enabled)
+- **Adresse d'envoi** : `noreply@swipego.app`
+- **API Key** : `re_9kFcbvM5_3HPF5yXXYU6pFeSAAYbJjFh1`
+- **Destinataires** : `joy.slama@gmail.com` (toujours) + `client_email` si renseigne
+- **DNS configures sur OVH** : SPF, DKIM, DMARC pour swipego.app
+
+## APK Mobile
+- **URL telechargement** : `https://joja.swipego.app/apk/joja-distribution.apk`
+- **Build sur le serveur** : Flutter 3.27.4 + Android SDK sur 217.182.89.133
+- **Taille** : ~15MB (arm64-v8a + armeabi-v7a)
+- **Stockage** : fichier statique dans `web/public/apk/`
+- **Procedure de mise a jour** : builder sur le serveur, remplacer dans web/public/apk/, mettre a jour la date dans Admin/public/index.html, push + deploy les deux repos
+
 ### A faire
-- [ ] Configurer l'envoi d'email (Resend avec domaine verifie ou Gmail SMTP)
 - [ ] Tester l'app Flutter sur un vrai appareil
 - [ ] Nettoyer les anciennes tables JOJA dans le Supabase partage
 - [ ] Supprimer le dossier /supabase/ du repo (plus utilise)
