@@ -16,11 +16,11 @@ Future<void> main() async {
   await Supabase.initialize(
     url: const String.fromEnvironment(
       'SUPABASE_URL',
-      defaultValue: 'https://bpxsodccsochwltzilqr.supabase.co',
+      defaultValue: 'https://supabase-api.swipego.app',
     ),
     anonKey: const String.fromEnvironment(
       'SUPABASE_ANON_KEY',
-      defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJweHNvZGNjc29jaHdsdHppbHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NzU3MDksImV4cCI6MjA4NzQ1MTcwOX0.TmX_5dUOCm3deQrFmw9thrwIe8hprocRkOoMj5IP1AA',
+      defaultValue: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3MTI3NDIyMCwiZXhwIjo0OTI2OTQ3ODIwLCJyb2xlIjoiYW5vbiJ9.4c5wruvy-jj3M8fSjhmgR4FvdF6za-mgawlkB_B0uB0',
     ),
   );
 
