@@ -1,7 +1,7 @@
 // Utilitaires d'authentification : JWT + bcrypt
 // Remplace Supabase Auth pour la gestion des tokens et mots de passe
 import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
+import { hash as bcryptHash, compare as bcryptCompare } from "bcryptjs";
 
 // Type du payload JWT
 export interface JwtPayload {
@@ -41,7 +41,7 @@ export function verifyToken(token: string): JwtPayload | null {
  * Hasher un mot de passe avec bcrypt (12 rounds)
  */
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
+  return bcryptHash(password, 12);
 }
 
 /**
@@ -49,7 +49,7 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export async function comparePassword(
   password: string,
-  hash: string
+  passwordHash: string
 ): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+  return bcryptCompare(password, passwordHash);
 }

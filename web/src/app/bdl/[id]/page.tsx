@@ -36,8 +36,10 @@ export default function BdlDetailPage() {
   const [bdl, setBdl] = useState<DeliveryNote | null>(null);
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [signatureError, setSignatureError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
 
   // Charger les donnees du BDL
@@ -80,13 +82,45 @@ export default function BdlDetailPage() {
   }, [id, router]);
 
   // Telecharger / apercu du PDF via l'API REST
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!bdl?.pdf_path) {
-      alert("Aucun PDF disponible");
+      alert("Aucun PDF disponible. Utilisez 'Regenerer le PDF' pour le recreer.");
       return;
     }
-    // Ouvrir le PDF dans un nouvel onglet (authentifie par cookie)
-    window.open(`/api/files/pdfs/${bdl.pdf_path}`, "_blank");
+    // Verifier que le fichier existe avant d'ouvrir
+    try {
+      const checkRes = await fetch(`/api/files/pdfs/${bdl.pdf_path}`, { method: "HEAD" });
+      if (checkRes.ok) {
+        window.open(`/api/files/pdfs/${bdl.pdf_path}`, "_blank");
+      } else {
+        alert("Le fichier PDF est introuvable sur le serveur. Utilisez 'Regenerer le PDF' pour le recreer.");
+      }
+    } catch {
+      alert("Erreur lors de la verification du PDF.");
+    }
+  };
+
+  // Regenerer le PDF (recrire le fichier + renvoyer l'email)
+  const handleRegenerate = async () => {
+    if (!bdl) return;
+    setRegenerating(true);
+    try {
+      const response = await fetch("/api/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ delivery_note_id: bdl.id }),
+      });
+      const result = await response.json();
+      if (result.ok) {
+        alert("PDF regenere et email renvoye avec succes !");
+        window.location.reload();
+      } else {
+        alert(`Erreur: ${result.error}`);
+      }
+    } catch (err) {
+      alert(`Erreur reseau : ${err}`);
+    }
+    setRegenerating(false);
   };
 
   // Retry envoi email via l'API REST /api/generate-pdf
@@ -307,7 +341,7 @@ export default function BdlDetailPage() {
             SIGNATURE CLIENT
           </label>
           <div style={{ marginTop: 8 }}>
-            {signatureUrl ? (
+            {signatureUrl && !signatureError ? (
               <img
                 src={signatureUrl}
                 alt="Signature"
@@ -317,7 +351,12 @@ export default function BdlDetailPage() {
                   border: "1px solid #e5e7eb",
                   borderRadius: 6,
                 }}
+                onError={() => setSignatureError(true)}
               />
+            ) : signatureUrl && signatureError ? (
+              <p style={{ color: "#ef4444", fontSize: 14 }}>
+                Fichier signature introuvable sur le serveur (fichier perdu lors d&apos;un redeploy)
+              </p>
             ) : (
               <p style={{ color: "#9ca3af" }}>Aucune signature</p>
             )}
@@ -341,6 +380,23 @@ export default function BdlDetailPage() {
             }}
           >
             Télécharger le PDF
+          </button>
+
+          <button
+            onClick={handleRegenerate}
+            disabled={regenerating}
+            style={{
+              padding: "10px 24px",
+              background: regenerating ? "#fde68a" : "#f59e0b",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: regenerating ? "not-allowed" : "pointer",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            {regenerating ? "Regeneration..." : "Regenerer le PDF"}
           </button>
 
           {bdl.status === "EMAIL_FAILED" && (
