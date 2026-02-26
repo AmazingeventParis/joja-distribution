@@ -165,8 +165,10 @@ Toutes les routes incluent des headers CORS pour l'acces mobile.
 ## Generation PDF (API route)
 - Route : `/api/generate-pdf` (POST, auth requise)
 - Utilise `pdf-lib` pour generer un vrai PDF natif
-- PDF A4 avec : en-tete JOJA DISTRIBUTION, sections colorees, signature PNG, pied de page
-- Sauvegarde dans `/app/uploads/pdfs/`
+- **Logo** : `web/public/logo-joja.png` (logo JOJA grains de cafe), centre en haut du PDF (90px), lu depuis `public/` au runtime
+- PDF A4 avec : logo centre, numero BDL + date centres, sections colorees, signature PNG, pied de page
+- Sauvegarde dans PostgreSQL (table `files`, bucket `pdfs`)
+- Signature et logo lus depuis PostgreSQL (table `files`)
 - Envoie par email via Resend a `joy.slama@gmail.com` (+ client_email si renseigne)
 - Logue dans `email_logs` et met a jour le statut du BDL
 
@@ -256,6 +258,17 @@ ssh ubuntu@217.182.89.133 "sudo docker logs --tail 100 $(sudo docker ps -q --fil
 - **Taille** : ~15MB (arm64-v8a + armeabi-v7a)
 - **Stockage** : fichier statique dans `web/public/apk/`
 - **Procedure de mise a jour** : builder sur le serveur, remplacer dans web/public/apk/, mettre a jour la date dans Admin/public/index.html, push + deploy les deux repos
+
+### Session 7 - 26 fevrier 2026 - Migration bytea + Logo PDF
+- [x] Migration stockage fichiers : filesystem Docker -> PostgreSQL bytea (table `files`)
+- [x] Auto-migration dans db.ts (CREATE TABLE IF NOT EXISTS files)
+- [x] Routes modifiees : upload, files/[...path], generate-pdf, send-to-client
+- [x] Supprime : debug-fs endpoint, Dockerfile VOLUME, UPLOADS_DIR env var, custom_docker_run_options
+- [x] Logo JOJA (grains de cafe) ajoute dans `web/public/logo-joja.png`
+- [x] PDF : logo centre en en-tete (90px), remplace le texte "JOJA DISTRIBUTION"
+- [x] PDF : numero BDL et date centres sous le logo
+- [x] Deploye et teste sur https://joja.swipego.app (upload + download fichiers OK)
+- [x] Date APK mise a jour sur admin.swipego.app (26/02/2026 a 15:28)
 
 ### A faire
 - [ ] Tester l'app Flutter sur un vrai appareil
