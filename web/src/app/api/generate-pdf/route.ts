@@ -1,16 +1,10 @@
 // API Route : POST /api/generate-pdf
-// Remplace l'Edge Function Supabase generate_and_email_pdf
-// Genere un vrai PDF avec pdf-lib, le sauvegarde sur disque,
+// Genere un vrai PDF avec pdf-lib, le stocke dans PostgreSQL (table files),
 // envoie les emails via Resend, et met a jour le statut du BDL
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { requireAuth, AuthError } from "@/lib/auth-middleware";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { readFile, writeFile, mkdir } from "fs/promises";
-import path from "path";
-
-// Repertoire d'uploads
-const UPLOADS_DIR = process.env.UPLOADS_DIR || "/app/uploads";
 
 // Headers CORS pour acces mobile
 const corsHeaders = {
@@ -67,6 +61,26 @@ function wrapText(
   return lines;
 }
 
+// --- Lire un fichier depuis la table files ---
+async function readFileFromDB(bucket: string, filename: string): Promise<Buffer | null> {
+  const { rows } = await pool.query(
+    "SELECT data FROM files WHERE bucket = $1 AND filename = $2",
+    [bucket, filename]
+  );
+  if (rows.length === 0) return null;
+  return rows[0].data as Buffer;
+}
+
+// --- Ecrire/remplacer un fichier dans la table files ---
+async function writeFileToDB(bucket: string, filename: string, data: Buffer, mimeType: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO files (id, bucket, filename, data, mime_type, created_at)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())
+     ON CONFLICT (bucket, filename) DO UPDATE SET data = $3, mime_type = $4`,
+    [bucket, filename, data, mimeType]
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     requireAuth(req);
@@ -118,13 +132,14 @@ export async function POST(req: NextRequest) {
     );
     const driverName = driverRows[0]?.name || "Livreur inconnu";
 
-    // --- 4) Lire la signature PNG depuis le systeme de fichiers ---
+    // --- 4) Lire la signature PNG depuis PostgreSQL ---
     let signatureBytes: Uint8Array | null = null;
     if (bdl.signature_path) {
       try {
-        const sigPath = path.join(UPLOADS_DIR, "signatures", bdl.signature_path);
-        const sigBuffer = await readFile(sigPath);
-        signatureBytes = new Uint8Array(sigBuffer);
+        const sigBuffer = await readFileFromDB("signatures", bdl.signature_path);
+        if (sigBuffer) {
+          signatureBytes = new Uint8Array(sigBuffer);
+        }
       } catch (err) {
         console.error("Impossible de lire la signature:", err);
       }
@@ -134,9 +149,10 @@ export async function POST(req: NextRequest) {
     let logoBytes: Uint8Array | null = null;
     if (company?.logo_path) {
       try {
-        const logoPath = path.join(UPLOADS_DIR, "logos", company.logo_path);
-        const logoBuffer = await readFile(logoPath);
-        logoBytes = new Uint8Array(logoBuffer);
+        const logoBuffer = await readFileFromDB("logos", company.logo_path);
+        if (logoBuffer) {
+          logoBytes = new Uint8Array(logoBuffer);
+        }
       } catch (err) {
         console.error("Impossible de lire le logo:", err);
       }
@@ -480,12 +496,9 @@ export async function POST(req: NextRequest) {
     // --- Sauvegarder le PDF en bytes ---
     const pdfBytes = await pdfDoc.save();
 
-    // --- 8) Sauvegarder le PDF sur le disque ---
+    // --- 8) Sauvegarder le PDF dans PostgreSQL ---
     const pdfFilename = `${bdl.bdl_number}.pdf`;
-    const pdfDir = path.join(UPLOADS_DIR, "pdfs");
-    await mkdir(pdfDir, { recursive: true });
-    const pdfFilePath = path.join(pdfDir, pdfFilename);
-    await writeFile(pdfFilePath, Buffer.from(pdfBytes));
+    await writeFileToDB("pdfs", pdfFilename, Buffer.from(pdfBytes), "application/pdf");
 
     // --- 9) Mettre a jour le BDL avec le chemin du PDF ---
     await pool.query(

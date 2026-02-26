@@ -1,14 +1,9 @@
 // API Route : POST /api/send-to-client
 // Envoyer le PDF du BDL au client par email via Resend
-// Remplace les appels Supabase Storage par lecture directe du systeme de fichiers
+// Lit le PDF depuis PostgreSQL (table files)
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { requireAuth, AuthError } from "@/lib/auth-middleware";
-import { readFile } from "fs/promises";
-import path from "path";
-
-// Repertoire d'uploads
-const UPLOADS_DIR = process.env.UPLOADS_DIR || "/app/uploads";
 
 // Headers CORS pour acces mobile
 const corsHeaders = {
@@ -86,12 +81,13 @@ export async function POST(req: NextRequest) {
     );
     const driverName = driverRows[0]?.name || "Livreur inconnu";
 
-    // 4) Lire le PDF depuis le systeme de fichiers
-    let pdfBuffer: Buffer;
-    try {
-      const pdfFilePath = path.join(UPLOADS_DIR, "pdfs", bdl.pdf_path);
-      pdfBuffer = await readFile(pdfFilePath);
-    } catch {
+    // 4) Lire le PDF depuis PostgreSQL
+    const { rows: fileRows } = await pool.query(
+      "SELECT data FROM files WHERE bucket = 'pdfs' AND filename = $1",
+      [bdl.pdf_path]
+    );
+
+    if (fileRows.length === 0) {
       return NextResponse.json(
         { ok: false, error: "Impossible de lire le fichier PDF" },
         { status: 500, headers: corsHeaders }
@@ -99,7 +95,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Convertir le PDF en base64
-    const pdfBase64 = pdfBuffer.toString("base64");
+    const pdfBase64 = (fileRows[0].data as Buffer).toString("base64");
 
     // 5) Formater la date
     const dateObj = new Date(bdl.validated_at);

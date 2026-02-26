@@ -1,13 +1,9 @@
 // API Route : GET /api/files/{bucket}/{filename}
-// Sert les fichiers depuis le systeme de fichiers local (remplace Supabase Storage signed URLs)
-// Catch-all route : /api/files/pdfs/BDL-xxx.pdf, /api/files/signatures/xxx.png, etc.
+// Sert les fichiers depuis PostgreSQL (table files, colonne bytea)
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-middleware";
-import { readFile, stat } from "fs/promises";
+import { pool } from "@/lib/db";
 import pathModule from "path";
-
-// Repertoire d'uploads
-const UPLOADS_DIR = process.env.UPLOADS_DIR || "/app/uploads";
 
 // Buckets autorises
 const ALLOWED_BUCKETS = ["logos", "signatures", "pdfs"];
@@ -28,7 +24,6 @@ export async function GET(
   { params }: { params: { path: string[] } }
 ) {
   try {
-    // Verifier l'authentification (Bearer header ou cookie)
     const user = getUserFromRequest(req);
     if (!user) {
       return NextResponse.json(
@@ -39,7 +34,6 @@ export async function GET(
 
     const pathSegments = params.path;
 
-    // On attend au minimum : bucket/filename
     if (!pathSegments || pathSegments.length < 2) {
       return NextResponse.json(
         { error: "Chemin invalide. Format attendu : /api/files/{bucket}/{filename}" },
@@ -50,7 +44,6 @@ export async function GET(
     const bucket = pathSegments[0];
     const filename = pathSegments.slice(1).join("/");
 
-    // Verifier le bucket
     if (!ALLOWED_BUCKETS.includes(bucket)) {
       return NextResponse.json(
         { error: "Bucket non autorise" },
@@ -58,7 +51,6 @@ export async function GET(
       );
     }
 
-    // Securite : empecher les path traversal (../../etc/passwd)
     const safeName = pathModule.basename(filename);
     if (safeName !== filename || filename.includes("..")) {
       return NextResponse.json(
@@ -67,29 +59,26 @@ export async function GET(
       );
     }
 
-    const filePath = pathModule.join(UPLOADS_DIR, bucket, safeName);
+    const { rows } = await pool.query(
+      "SELECT data, mime_type FROM files WHERE bucket = $1 AND filename = $2",
+      [bucket, safeName]
+    );
 
-    // Verifier que le fichier existe
-    try {
-      await stat(filePath);
-    } catch {
+    if (rows.length === 0) {
       return NextResponse.json(
         { error: "Fichier introuvable" },
         { status: 404, headers: corsHeaders }
       );
     }
 
-    // Lire le fichier
-    const fileBuffer = await readFile(filePath);
+    const fileData = rows[0].data as Buffer;
+    const mimeType = rows[0].mime_type as string;
 
-    // Determiner le Content-Type
-    const contentType = getContentType(safeName);
-
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileData), {
       status: 200,
       headers: {
         ...corsHeaders,
-        "Content-Type": contentType,
+        "Content-Type": mimeType,
         "Content-Disposition": `inline; filename="${safeName}"`,
         "Cache-Control": "private, max-age=3600",
       },
@@ -101,19 +90,4 @@ export async function GET(
       { status: 500, headers: corsHeaders }
     );
   }
-}
-
-// Determiner le type MIME a partir de l'extension
-function getContentType(filename: string): string {
-  const ext = pathModule.extname(filename).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    ".pdf": "application/pdf",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".webp": "image/webp",
-    ".svg": "image/svg+xml",
-    ".gif": "image/gif",
-  };
-  return mimeTypes[ext] || "application/octet-stream";
 }

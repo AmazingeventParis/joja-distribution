@@ -13,7 +13,7 @@ JOJA Distribution (standalone)
 +-- Next.js 14 (web admin + API REST)
 +-- PostgreSQL 16 (container dedie sur Coolify)
 +-- Auth custom (bcrypt + JWT HttpOnly cookies)
-+-- Stockage fichiers local (volume Docker)
++-- Stockage fichiers dans PostgreSQL (table files, colonnes bytea)
 +-- PDF generation (pdf-lib dans API route Next.js)
 +-- Email (Resend API)
 +-- Flutter mobile (appelle l'API REST Next.js)
@@ -23,7 +23,7 @@ JOJA Distribution (standalone)
 - **Backend** : Next.js 14 API Routes (Node.js)
 - **Base de donnees** : PostgreSQL 16 (container Docker dedie sur Coolify)
 - **Auth** : bcrypt (hash mot de passe) + jsonwebtoken (JWT 7 jours)
-- **Stockage** : Volume Docker `joja-uploads:/app/uploads` (logos, signatures, pdfs)
+- **Stockage** : PostgreSQL bytea (table `files` avec colonnes data/mime_type, pas de filesystem)
 - **PDF** : pdf-lib (generation native dans API route Next.js)
 - **Email** : Resend API
 - **Mobile** : Flutter (Android/iOS) + speech_to_text (FR) + hand_signature (canvas PNG)
@@ -43,15 +43,16 @@ JOJA Distribution (standalone)
 DATABASE_URL=postgres://joja:JojaDistr2026SecureDB@po4gc0sg84wkocg0wg0ccssk:5432/joja
 JWT_SECRET=bd1e4cb2f1309aeaf9964785a385988f2db5bfb66ebe98017f3a337d930486f185117295911a728493f87fb7294f2be0
 RESEND_API_KEY=re_9kFcbvM5_3HPF5yXXYU6pFeSAAYbJjFh1
-UPLOADS_DIR=/app/uploads
 ```
 
-### Volume Docker
-- `joja-uploads:/app/uploads` avec sous-dossiers `/logos`, `/signatures`, `/pdfs`
+### Stockage fichiers
+Les fichiers (signatures, PDFs, logos) sont stockes dans PostgreSQL (table `files`, colonne BYTEA).
+Plus de volume Docker ni de filesystem - tout persiste dans la BDD.
 
 ## Architecture du projet
 ```
 /sql/schema_standalone.sql                  -> Schema BDD standalone (sans Supabase)
+/sql/migration_bytea.sql                    -> Migration : table files pour stockage bytea
 /mobile/                                    -> App Flutter (livreurs)
   /mobile/lib/main.dart                     -> Point d'entree (pas de Supabase)
   /mobile/lib/services/api_service.dart     -> Client HTTP REST (auth JWT + toutes operations)
@@ -106,6 +107,8 @@ CREATE TABLE delivery_notes (id UUID PK, bdl_number, driver_id FK->users, client
   client_email, address, details, signature_path, pdf_path, status, validated_at, created_at);
 CREATE TABLE email_logs (id UUID PK, delivery_note_id FK->delivery_notes, to_email, status, error);
 CREATE TABLE clients (id UUID PK, name, email, address, created_at);
+CREATE TABLE files (id UUID PK, bucket TEXT, filename TEXT, data BYTEA, mime_type TEXT, created_at,
+  UNIQUE(bucket, filename));
 
 -- Sequence pour numerotation BDL : BDL-YYYYMMDD-XXXXX
 CREATE SEQUENCE bdl_daily_seq;

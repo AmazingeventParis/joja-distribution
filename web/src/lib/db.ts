@@ -16,4 +16,21 @@ pool.on("error", (err) => {
   console.error("Erreur inattendue sur le pool PostgreSQL :", err);
 });
 
+// Auto-migration : creer la table files si elle n'existe pas
+pool.query(`
+  CREATE TABLE IF NOT EXISTS files (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    data BYTEA NOT NULL,
+    mime_type TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(bucket, filename)
+  )
+`).then(() => {
+  console.log("Table files OK");
+}).catch((err) => {
+  console.error("Erreur creation table files :", err);
+});
+
 export { pool };

@@ -19,16 +19,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Creer le dossier uploads et ses sous-dossiers
-RUN mkdir -p /app/uploads/logos /app/uploads/signatures /app/uploads/pdfs
-
 # Copier le standalone output
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-
-# Le volume pour les fichiers uploades (persiste entre les deployments)
-VOLUME ["/app/uploads"]
 
 EXPOSE 3000
 
