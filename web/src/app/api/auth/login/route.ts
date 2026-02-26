@@ -86,9 +86,8 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     console.error("Erreur login:", error);
-    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Erreur interne du serveur", detail: message },
+      { error: "Erreur interne du serveur" },
       { status: 500, headers: corsHeaders }
     );
   }
