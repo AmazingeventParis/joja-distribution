@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ChangePasswordModal from "../components/ChangePasswordModal";
 
 interface Driver {
   id: string;
@@ -16,6 +17,9 @@ export default function ChauffeursPage() {
   const router = useRouter();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modale mot de passe
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Formulaire d'ajout
   const [showForm, setShowForm] = useState(false);
@@ -257,20 +261,37 @@ export default function ChauffeursPage() {
             </button>
           </nav>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            padding: "8px 20px",
-            background: "#ef4444",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
-          Déconnexion
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setShowPasswordModal(true)}
+            style={{
+              padding: "8px 16px",
+              background: "#f3f4f6",
+              color: "#374151",
+              border: "1px solid #d1d5db",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: 500,
+              fontSize: 14,
+            }}
+          >
+            Mot de passe
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: "8px 20px",
+              background: "#ef4444",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Déconnexion
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -576,6 +597,12 @@ export default function ChauffeursPage() {
       >
         {drivers.length} chauffeur(s)
       </p>
+
+      {/* Modale changement de mot de passe */}
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
 
       {/* Modale modification chauffeur */}
       {editDriver && (

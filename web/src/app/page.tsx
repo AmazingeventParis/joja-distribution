@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ChangePasswordModal from "./components/ChangePasswordModal";
 
 // Types
 interface DeliveryNote {
@@ -23,6 +24,9 @@ export default function HomePage() {
   const [bdls, setBdls] = useState<DeliveryNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+
+  // Modale mot de passe
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Filtres
   const [filterClient, setFilterClient] = useState("");
@@ -176,20 +180,37 @@ export default function HomePage() {
             </button>
           </nav>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            padding: "8px 20px",
-            background: "#ef4444",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
-          Déconnexion
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setShowPasswordModal(true)}
+            style={{
+              padding: "8px 16px",
+              background: "#f3f4f6",
+              color: "#374151",
+              border: "1px solid #d1d5db",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: 500,
+              fontSize: 14,
+            }}
+          >
+            Mot de passe
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: "8px 20px",
+              background: "#ef4444",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Déconnexion
+          </button>
+        </div>
       </div>
 
       {/* Filtres */}
@@ -373,6 +394,12 @@ export default function HomePage() {
       >
         {bdls.length} bon(s) de livraison
       </p>
+
+      {/* Modale changement de mot de passe */}
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
     </div>
   );
 }
