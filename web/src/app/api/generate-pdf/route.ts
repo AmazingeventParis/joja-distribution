@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { requireAuth, AuthError } from "@/lib/auth-middleware";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { readFile } from "fs/promises";
+import path from "path";
 
 // Headers CORS pour acces mobile
 const corsHeaders = {
@@ -145,17 +147,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // --- 5) Lire le logo si present ---
+    // --- 5) Lire le logo JOJA depuis public/ ---
     let logoBytes: Uint8Array | null = null;
-    if (company?.logo_path) {
-      try {
-        const logoBuffer = await readFileFromDB("logos", company.logo_path);
-        if (logoBuffer) {
-          logoBytes = new Uint8Array(logoBuffer);
-        }
-      } catch (err) {
-        console.error("Impossible de lire le logo:", err);
-      }
+    try {
+      const logoPath = path.join(process.cwd(), "public", "logo-joja.png");
+      const logoBuffer = await readFile(logoPath);
+      logoBytes = new Uint8Array(logoBuffer);
+    } catch (err) {
+      console.error("Impossible de lire le logo JOJA:", err);
     }
 
     // --- 6) Formater la date ---
@@ -196,8 +195,8 @@ export async function POST(req: NextRequest) {
     const contentWidth = pageWidth - marginLeft * 2;
     let y = 800;
 
-    // --- EN-TETE : Logo + Nom societe ---
-    let logoXEnd = marginLeft;
+    // --- EN-TETE : Logo JOJA centre ---
+    const logoH = 90;
     if (logoBytes) {
       try {
         let logoImage;
@@ -206,51 +205,59 @@ export async function POST(req: NextRequest) {
         } catch {
           logoImage = await pdfDoc.embedJpg(logoBytes);
         }
-        const logoScale = 50 / logoImage.height;
+        const logoScale = logoH / logoImage.height;
         const logoW = logoImage.width * logoScale;
         page.drawImage(logoImage, {
-          x: marginLeft,
-          y: y - 40,
+          x: (pageWidth - logoW) / 2,
+          y: y - logoH + 10,
           width: logoW,
-          height: 50,
+          height: logoH,
         });
-        logoXEnd = marginLeft + logoW + 12;
+        y -= logoH + 5;
       } catch {
-        // Logo invalide, on continue sans
+        // Logo invalide, fallback texte
+        page.drawText(cleanText(companyName), {
+          x: marginLeft,
+          y: y - 8,
+          size: 20,
+          font: helveticaBold,
+          color: blue,
+        });
+        y -= 30;
       }
+    } else {
+      page.drawText(cleanText(companyName), {
+        x: marginLeft,
+        y: y - 8,
+        size: 20,
+        font: helveticaBold,
+        color: blue,
+      });
+      y -= 30;
     }
 
-    page.drawText(cleanText(companyName), {
-      x: logoXEnd,
-      y: y - 8,
-      size: 20,
-      font: helveticaBold,
-      color: blue,
-    });
-
-    // Numero BDL (a droite)
+    // Numero BDL + Date (centres sous le logo)
     const bdlNumText = cleanText(bdl.bdl_number);
     const bdlNumW = helveticaBold.widthOfTextAtSize(bdlNumText, 13);
     page.drawText(bdlNumText, {
-      x: pageWidth - marginLeft - bdlNumW,
-      y: y - 5,
+      x: (pageWidth - bdlNumW) / 2,
+      y,
       size: 13,
       font: helveticaBold,
       color: grayText,
     });
+    y -= 16;
 
-    // Date (a droite)
     const dateText = cleanText(validatedDate);
     const dateW = helvetica.widthOfTextAtSize(dateText, 10);
     page.drawText(dateText, {
-      x: pageWidth - marginLeft - dateW,
-      y: y - 22,
+      x: (pageWidth - dateW) / 2,
+      y,
       size: 10,
       font: helvetica,
       color: grayText,
     });
-
-    y -= 55;
+    y -= 15;
 
     // Ligne bleue
     page.drawLine({
@@ -260,20 +267,20 @@ export async function POST(req: NextRequest) {
       color: blueAccent,
     });
 
-    y -= 35;
+    y -= 25;
 
     // --- TITRE ---
     const title = "BON DE LIVRAISON";
-    const titleW = helveticaBold.widthOfTextAtSize(title, 18);
+    const titleW = helveticaBold.widthOfTextAtSize(title, 16);
     page.drawText(title, {
       x: (pageWidth - titleW) / 2,
       y,
-      size: 18,
+      size: 16,
       font: helveticaBold,
       color: blue,
     });
 
-    y -= 40;
+    y -= 30;
 
     // --- Fonction locale : dessiner une section ---
     const drawSection = (
