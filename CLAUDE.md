@@ -140,7 +140,7 @@ CREATE SEQUENCE bdl_daily_seq;
 ### Bons de livraison
 | Route | Methode | Description |
 |-------|---------|-------------|
-| `/api/delivery-notes` | GET | Lister (filtres: client_name, status, date) |
+| `/api/delivery-notes` | GET | Lister (filtres: client_name, status, date, date_from, date_to) |
 | `/api/delivery-notes` | POST | Creer un BDL |
 | `/api/delivery-notes/[id]` | GET | Detail d'un BDL |
 | `/api/delivery-notes/[id]` | PATCH | Modifier un BDL |
@@ -291,6 +291,15 @@ ssh ubuntu@217.182.89.133 "sudo docker logs --tail 100 $(sudo docker ps -q --fil
 - **Branche** : main
 - **Machine** : macOS M2 (8 coeurs, 8 Go)
 - **Prochaine etape** : connecter Apple Developer via App Store Connect API (Issuer ID + Key ID + .p8)
+
+### Session 9 - 02 mars 2026 - Ameliorations BDL
+- [x] Email par defaut change : `joy.slama@gmail.com` → `bondelivraisonjoja@gmail.com`
+- [x] Migration auto dans db.ts pour mettre a jour l'email dans company_settings en production
+- [x] Filtre date sur la page admin : remplace le champ date unique par une plage "Du / Au" (date_from, date_to)
+- [x] API delivery-notes supporte les params `date_from` et `date_to` (+ ancien `date` pour compatibilite mobile)
+- [x] Adresse rendue facultative sur la creation de BDL (mobile + API)
+- [x] Label "Adresse *" remplace par "Adresse (optionnel)" sur l'APK
+- [x] APK rebuilde et deploye (18 MB, 02/03/2026 a 21:38)
 
 ### A faire
 - [ ] Connecter le compte Apple Developer sur Codemagic

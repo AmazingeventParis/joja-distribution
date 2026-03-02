@@ -13,7 +13,7 @@
 |--------|------------------|--------|
 | Base de donnees | PostgreSQL 16 (container Docker dedie) | Independance totale, pas de partage avec d'autres projets |
 | Authentification | bcrypt + JWT custom | Simple, pas de dependance externe, HttpOnly cookies securises |
-| Stockage fichiers | Filesystem local (dossier public Next.js) | Simple, pas besoin de service externe |
+| Stockage fichiers | PostgreSQL bytea (table `files`) | Persiste entre redeploiements, pas de volume Docker |
 | Generation PDF | pdf-lib (API route Next.js) | Vrai PDF natif, fonctionne en Node.js sans service externe |
 | Envoi emails | Resend API | API simple, plan gratuit suffisant |
 | App mobile | Flutter | Cross-platform Android/iOS, un seul code |
@@ -63,7 +63,6 @@ Serveur OVH (217.182.89.133)
 DATABASE_URL=postgres://joja:JojaDistr2026SecureDB@po4gc0sg84wkocg0wg0ccssk:5432/joja
 JWT_SECRET=bd1e4cb2f1309aeaf9964785a385988f2db5bfb66ebe98017f3a337d930486f185117295911a728493f87fb7294f2be0
 RESEND_API_KEY=re_9kFcbvM5_3HPF5yXXYU6pFeSAAYbJjFh1
-UPLOADS_DIR=/app/uploads
 ```
 
 ---
@@ -82,7 +81,7 @@ users (remplace auth.users + profiles de Supabase)
 company_settings (1 ligne unique)
   ├── company_name (default: 'JOJA DISTRIBUTION')
   ├── logo_path (optionnel)
-  ├── main_email (default: 'joy.slama@gmail.com')
+  ├── main_email (default: 'bondelivraisonjoja@gmail.com')
   └── created_at
 
 delivery_notes (1 par bon de livraison)
@@ -90,7 +89,7 @@ delivery_notes (1 par bon de livraison)
   ├── bdl_number: BDL-YYYYMMDD-XXXXX (unique, auto-genere via bdl_daily_seq)
   ├── client_name (obligatoire)
   ├── client_email (optionnel)
-  ├── address (obligatoire)
+  ├── address (optionnel)
   ├── details (obligatoire)
   ├── signature_path → fichier dans uploads/signatures/
   ├── pdf_path → fichier dans uploads/pdfs/
@@ -159,7 +158,7 @@ L'autorisation se fait dans les API routes (pas de RLS SQL).
 ### Bons de livraison
 | Route | Methode | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/delivery-notes` | GET | Oui | Liste (filtres: client_name, status, date) |
+| `/api/delivery-notes` | GET | Oui | Liste (filtres: client_name, status, date, date_from, date_to) |
 | `/api/delivery-notes` | POST | Oui | Creer un BDL |
 | `/api/delivery-notes/[id]` | GET | Oui | Detail |
 | `/api/delivery-notes/[id]` | PATCH | Oui | Modifier |
@@ -195,7 +194,7 @@ Toutes les routes incluent des headers CORS pour l'acces mobile.
   2. Saisir infos BDL :
      - Client (obligatoire) + autocompletion depuis /api/clients
      - Email client (optionnel)
-     - Adresse (obligatoire)
+     - Adresse (optionnel)
      - Detail livraison (obligatoire) + bouton Dicter (speech_to_text FR)
      - Zone signature (hand_signature canvas)
   3. Clic VALIDER
@@ -217,7 +216,7 @@ Toutes les routes incluent des headers CORS pour l'acces mobile.
 [Admin - Web Next.js]
   1. Login → /api/auth/me verifie le role admin
   2. Navigation : Bons de Livraison | Chauffeurs | Clients
-  3. Liste BDL avec filtres (client, statut, date)
+  3. Liste BDL avec filtres (client, statut, plage de dates Du/Au)
   4. Detail BDL : signature, PDF, historique emails, retry, envoi au client
   5. Chauffeurs : tableau + ajout (bcrypt hash) + suppression
   6. Clients : tableau + ajout + modification inline + suppression
@@ -241,7 +240,7 @@ Toutes les routes incluent des headers CORS pour l'acces mobile.
 ## Email envoye
 - **Domaine** : `swipego.app` (verifie sur Resend, DNS SPF+DKIM+DMARC configures sur OVH)
 - **From** : `JOJA DISTRIBUTION <noreply@swipego.app>`
-- **To** : `joy.slama@gmail.com` (toujours) + client_email (si renseigne)
+- **To** : `bondelivraisonjoja@gmail.com` (toujours) + client_email (si renseigne)
 - **Sujet** : `Bon de Livraison BDL-YYYYMMDD-XXXXX - JOJA DISTRIBUTION`
 - **Corps** : HTML avec resume (client, adresse, date, livreur)
 - **Piece jointe** : le PDF en base64
@@ -296,9 +295,8 @@ Toutes les routes incluent des headers CORS pour l'acces mobile.
 - Pas de gestion des produits/articles (texte libre)
 - Pas de modification d'un BDL apres validation
 - Pas de pagination sur la liste des BDL
-- Volume Docker non monte par Coolify (nixpacks) → fichiers uploades perdus au redeploiement
-  (les fichiers statiques dans web/public/ sont OK car inclus dans le build)
-  (l'APK est dans web/public/apk/ donc persiste)
+- Fichiers (signatures, PDFs) stockes en PostgreSQL bytea (table `files`) — persistent entre redeploiements
+  (l'APK est dans web/public/apk/ donc persiste aussi)
 
 ---
 
