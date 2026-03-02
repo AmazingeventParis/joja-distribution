@@ -129,12 +129,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!address || !address.trim()) {
-      return NextResponse.json(
-        { error: "L'adresse de livraison est requise" },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    // Adresse facultative
 
     // Generer le numero BDL : BDL-YYYYMMDD-XXXXX
     const now = new Date();
@@ -159,7 +154,7 @@ export async function POST(req: NextRequest) {
         bdlNumber,
         client_name.trim(),
         client_email?.trim() || null,
-        address.trim(),
+        address?.trim() || "",
         details?.trim() || null,
         signature_path || null,
         user.userId,

@@ -83,10 +83,6 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
       _showError('Le champ "Client / Societe" est obligatoire.');
       return;
     }
-    if (_addressController.text.trim().isEmpty) {
-      _showError('Le champ "Adresse" est obligatoire.');
-      return;
-    }
     if (_detailsController.text.trim().isEmpty) {
       _showError('Le champ "Detail livraison" est obligatoire.');
       return;
@@ -393,7 +389,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
 
             // --- Adresse ---
             const Text(
-              'Adresse *',
+              'Adresse (optionnel)',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 6),
