@@ -2,7 +2,7 @@
 
 ## Resume du projet
 Application pour generer, envoyer et gerer des Bons de Livraison (BDL) pour la societe **JOJA DISTRIBUTION**.
-Email de reception automatique : `joy.slama@gmail.com`
+Email de reception automatique : `bondelivraisonjoja@gmail.com`
 **URL production** : https://joja.swipego.app
 
 ## Architecture standalone (v2.0 - 25 fevrier 2026)
@@ -169,7 +169,7 @@ Toutes les routes incluent des headers CORS pour l'acces mobile.
 - PDF A4 avec : logo centre, numero BDL + date centres, sections colorees, signature PNG, pied de page
 - Sauvegarde dans PostgreSQL (table `files`, bucket `pdfs`)
 - Signature et logo lus depuis PostgreSQL (table `files`)
-- Envoie par email via Resend a `joy.slama@gmail.com` (+ client_email si renseigne)
+- Envoie par email via Resend a `bondelivraisonjoja@gmail.com` (+ client_email si renseigne)
 - Logue dans `email_logs` et met a jour le statut du BDL
 
 ## Numerotation BDL
@@ -249,7 +249,7 @@ ssh ubuntu@217.182.89.133 "sudo docker logs --tail 100 $(sudo docker ps -q --fil
 - **Domaine** : `swipego.app` (verifie, status: verified, sending: enabled)
 - **Adresse d'envoi** : `noreply@swipego.app`
 - **API Key** : `re_9kFcbvM5_3HPF5yXXYU6pFeSAAYbJjFh1`
-- **Destinataires** : `joy.slama@gmail.com` (toujours) + `client_email` si renseigne
+- **Destinataires** : `bondelivraisonjoja@gmail.com` (toujours) + `client_email` si renseigne
 - **DNS configures sur OVH** : SPF, DKIM, DMARC pour swipego.app
 
 ## APK Mobile

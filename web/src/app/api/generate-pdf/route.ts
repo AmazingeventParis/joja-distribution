@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     );
     const company = companyRows[0] || null;
     const companyName = company?.company_name || "JOJA DISTRIBUTION";
-    const mainEmail = company?.main_email || "joy.slama@gmail.com";
+    const mainEmail = company?.main_email || "bondelivraisonjoja@gmail.com";
 
     // --- 3) Charger le nom du livreur ---
     const { rows: driverRows } = await pool.query(

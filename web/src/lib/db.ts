@@ -33,4 +33,16 @@ pool.query(`
   console.error("Erreur creation table files :", err);
 });
 
+// Migration : mettre a jour l'email principal
+pool.query(`
+  UPDATE company_settings SET main_email = 'bondelivraisonjoja@gmail.com'
+  WHERE main_email = 'joy.slama@gmail.com'
+`).then((res) => {
+  if (res.rowCount && res.rowCount > 0) {
+    console.log("Email principal mis a jour vers bondelivraisonjoja@gmail.com");
+  }
+}).catch((err) => {
+  console.error("Erreur migration email :", err);
+});
+
 export { pool };

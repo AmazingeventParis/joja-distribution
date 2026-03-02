@@ -23,13 +23,13 @@ CREATE TABLE public.company_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_name TEXT NOT NULL DEFAULT 'JOJA DISTRIBUTION',
   logo_path TEXT,  -- chemin dans le bucket "logos"
-  main_email TEXT NOT NULL DEFAULT 'joy.slama@gmail.com',
+  main_email TEXT NOT NULL DEFAULT 'bondelivraisonjoja@gmail.com',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Insérer la ligne par défaut
 INSERT INTO public.company_settings (company_name, main_email)
-VALUES ('JOJA DISTRIBUTION', 'joy.slama@gmail.com');
+VALUES ('JOJA DISTRIBUTION', 'bondelivraisonjoja@gmail.com');
 
 -- ============================================================
 -- 3) SÉQUENCE pour numéro BDL quotidien
