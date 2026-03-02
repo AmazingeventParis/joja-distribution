@@ -31,7 +31,8 @@ export default function HomePage() {
   // Filtres
   const [filterClient, setFilterClient] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [filterDate, setFilterDate] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   // Verifier l'authentification au chargement
   useEffect(() => {
@@ -57,7 +58,8 @@ export default function HomePage() {
     const params = new URLSearchParams();
     if (filterClient) params.set("client_name", filterClient);
     if (filterStatus) params.set("status", filterStatus);
-    if (filterDate) params.set("date", filterDate);
+    if (filterDateFrom) params.set("date_from", filterDateFrom);
+    if (filterDateTo) params.set("date_to", filterDateTo);
 
     const queryString = params.toString();
     const url = `/api/delivery-notes${queryString ? `?${queryString}` : ""}`;
@@ -82,7 +84,7 @@ export default function HomePage() {
   // Recharger quand les filtres changent
   useEffect(() => {
     if (authenticated) loadBdls();
-  }, [filterClient, filterStatus, filterDate, authenticated]);
+  }, [filterClient, filterStatus, filterDateFrom, filterDateTo, authenticated]);
 
   // Deconnexion via l'API REST
   const handleLogout = async () => {
@@ -253,23 +255,39 @@ export default function HomePage() {
           <option value="EMAIL_FAILED">Email échoué</option>
         </select>
 
-        <input
-          type="date"
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
-          style={{
-            padding: 10,
-            borderRadius: 6,
-            border: "1px solid #d1d5db",
-            fontSize: 14,
-          }}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: "#6b7280", whiteSpace: "nowrap" }}>Du</span>
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            style={{
+              padding: 10,
+              borderRadius: 6,
+              border: "1px solid #d1d5db",
+              fontSize: 14,
+            }}
+          />
+          <span style={{ fontSize: 13, color: "#6b7280", whiteSpace: "nowrap" }}>au</span>
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            style={{
+              padding: 10,
+              borderRadius: 6,
+              border: "1px solid #d1d5db",
+              fontSize: 14,
+            }}
+          />
+        </div>
 
         <button
           onClick={() => {
             setFilterClient("");
             setFilterStatus("");
-            setFilterDate("");
+            setFilterDateFrom("");
+            setFilterDateTo("");
           }}
           style={{
             padding: "10px 20px",

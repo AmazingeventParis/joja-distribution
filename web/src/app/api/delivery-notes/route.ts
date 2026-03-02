@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
     const clientName = searchParams.get("client_name");
     const status = searchParams.get("status");
     const date = searchParams.get("date");
+    const dateFrom = searchParams.get("date_from");
+    const dateTo = searchParams.get("date_to");
     const driverId = searchParams.get("driver_id");
 
     // Construction dynamique de la requete SQL
@@ -62,13 +64,25 @@ export async function GET(req: NextRequest) {
       paramIndex++;
     }
 
-    // Filtre par date (YYYY-MM-DD)
+    // Filtre par date unique (YYYY-MM-DD) - compatibilite mobile
     if (date) {
       query += ` AND dn.created_at >= $${paramIndex}`;
       params.push(`${date}T00:00:00`);
       paramIndex++;
       query += ` AND dn.created_at <= $${paramIndex}`;
       params.push(`${date}T23:59:59`);
+      paramIndex++;
+    }
+
+    // Filtre par plage de dates (date_from / date_to)
+    if (dateFrom) {
+      query += ` AND dn.created_at >= $${paramIndex}`;
+      params.push(`${dateFrom}T00:00:00`);
+      paramIndex++;
+    }
+    if (dateTo) {
+      query += ` AND dn.created_at <= $${paramIndex}`;
+      params.push(`${dateTo}T23:59:59`);
       paramIndex++;
     }
 
