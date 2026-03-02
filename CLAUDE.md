@@ -270,8 +270,31 @@ ssh ubuntu@217.182.89.133 "sudo docker logs --tail 100 $(sudo docker ps -q --fil
 - [x] Deploye et teste sur https://joja.swipego.app (upload + download fichiers OK)
 - [x] Date APK mise a jour sur admin.swipego.app (26/02/2026 a 15:28)
 
+### Session 8 - 02 mars 2026 - iOS Codemagic + config mobile
+- [x] Configure iOS dans le projet Flutter (bundle ID: com.joja.distribution, nom: JOJA Distribution)
+- [x] Icones iOS generees (AppIcon.appiconset)
+- [x] Permissions iOS ajoutees (micro pour dictee vocale, camera)
+- [x] Codemagic connecte au repo GitHub (AmazingeventParis/joja-distribution)
+- [x] Workflow Codemagic cree (project path: mobile, branche: main, macOS M2)
+- [x] Bouton "iOS (Codemagic)" ajoute sur admin.swipego.app dans la carte JOJA
+- [ ] Connecter le compte Apple Developer sur Codemagic (App Store Connect API : Issuer ID + Key ID + fichier .p8)
+- [ ] Configurer la signature de code iOS (certificat de distribution + provisioning profile)
+- [ ] Lancer le premier build iOS sur Codemagic
+- [ ] Tester l'IPA sur un iPhone
+
+## Codemagic (CI/CD iOS)
+- **Service** : codemagic.io
+- **Compte** : jeremie.magnet@gmail.com
+- **Projet** : distribution de joja
+- **Repo** : github.com/AmazingeventParis/joja-distribution
+- **Project path** : `mobile` (sous-dossier Flutter)
+- **Branche** : main
+- **Machine** : macOS M2 (8 coeurs, 8 Go)
+- **Prochaine etape** : connecter Apple Developer via App Store Connect API (Issuer ID + Key ID + .p8)
+
 ### A faire
-- [ ] Tester l'app Flutter sur un vrai appareil
+- [ ] Connecter le compte Apple Developer sur Codemagic
+- [ ] Lancer le premier build iOS
 - [ ] Nettoyer les anciennes tables JOJA dans le Supabase partage
 - [ ] Supprimer le dossier /supabase/ du repo (plus utilise)
 - [ ] Creer quelques clients de test
