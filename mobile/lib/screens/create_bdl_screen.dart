@@ -28,6 +28,13 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
   // Liste des clients pour l'autocompletion
   List<Map<String, dynamic>> _clients = [];
 
+  // FocusNode pour passer au champ details apres selection client
+  final _detailsFocusNode = FocusNode();
+
+  // Scroll controller pour bloquer le scroll pendant la signature
+  final _scrollController = ScrollController();
+  bool _isSigningActive = false;
+
   // Signature
   final _signatureControl = HandSignatureControl(
     threshold: 3.0,
@@ -149,6 +156,9 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
     }
   }
 
+  // Texte deja present avant de lancer la dictee
+  String _textBeforeDictation = '';
+
   // Demarrer/arreter la dictee vocale
   Future<void> _toggleDictation() async {
     if (_isListening) {
@@ -159,13 +169,27 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
 
     final available = await _speech.initialize(
       onError: (error) {
-        setState(() => _isListening = false);
+        debugPrint('Erreur speech: ${error.errorMsg}');
+        if (mounted) setState(() => _isListening = false);
+      },
+      onStatus: (status) {
+        debugPrint('Speech status: $status');
+        // Quand la reconnaissance s'arrete d'elle-meme (timeout)
+        if (status == 'done' || status == 'notListening') {
+          if (mounted) setState(() => _isListening = false);
+        }
       },
     );
 
     if (!available) {
-      _showError('La reconnaissance vocale n\'est pas disponible.');
+      _showError('La reconnaissance vocale n\'est pas disponible. Verifiez les permissions du micro.');
       return;
+    }
+
+    // Sauvegarder le texte existant pour pouvoir ajouter a la suite
+    _textBeforeDictation = _detailsController.text;
+    if (_textBeforeDictation.isNotEmpty && !_textBeforeDictation.endsWith(' ')) {
+      _textBeforeDictation += ' ';
     }
 
     setState(() => _isListening = true);
@@ -173,8 +197,12 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
     await _speech.listen(
       onResult: (result) {
         setState(() {
-          // Ajouter le texte dicte au champ details
-          _detailsController.text = result.recognizedWords;
+          // Ajouter le texte dicte a la suite du texte existant
+          _detailsController.text = _textBeforeDictation + result.recognizedWords;
+          // Placer le curseur a la fin
+          _detailsController.selection = TextSelection.collapsed(
+            offset: _detailsController.text.length,
+          );
         });
       },
       localeId: 'fr_FR', // Francais
@@ -251,6 +279,10 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
         title: const Text('Nouveau BDL'),
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
+        physics: _isSigningActive
+            ? const NeverScrollableScrollPhysics()
+            : const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -283,6 +315,8 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
                 if (address.isNotEmpty) {
                   _addressController.text = address;
                 }
+                // Fermer le clavier et passer au champ suivant
+                FocusScope.of(context).requestFocus(_detailsFocusNode);
               },
               fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
                 // Synchroniser le textController avec _clientController
@@ -401,6 +435,7 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
             const SizedBox(height: 6),
             TextField(
               controller: _detailsController,
+              focusNode: _detailsFocusNode,
               maxLines: 5,
               decoration: InputDecoration(
                 hintText: 'Decrivez le contenu de la livraison...',
@@ -441,20 +476,31 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
               ],
             ),
             const SizedBox(height: 6),
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.white,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: HandSignature(
-                  control: _signatureControl,
-                  color: Colors.black,
-                  width: 2.0,
-                  type: SignatureDrawType.shape,
+            Listener(
+              onPointerDown: (_) {
+                setState(() => _isSigningActive = true);
+              },
+              onPointerUp: (_) {
+                setState(() => _isSigningActive = false);
+              },
+              onPointerCancel: (_) {
+                setState(() => _isSigningActive = false);
+              },
+              child: Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: HandSignature(
+                    control: _signatureControl,
+                    color: Colors.black,
+                    width: 2.0,
+                    type: SignatureDrawType.shape,
+                  ),
                 ),
               ),
             ),
@@ -510,6 +556,8 @@ class _CreateBdlScreenState extends State<CreateBdlScreen> {
     _emailController.dispose();
     _addressController.dispose();
     _detailsController.dispose();
+    _detailsFocusNode.dispose();
+    _scrollController.dispose();
     _speech.stop();
     super.dispose();
   }
